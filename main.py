@@ -125,7 +125,7 @@ class BetterIOPlugin(Star):
             if random.random() < self.conf["reply_prob"] and not any(
                 isinstance(item, Reply) for item in chain
             ):
-                chain.insert(0, At(qq=sender_id))
+                chain.insert(0, Reply(id=message_id))
             # 按概率@发送者
             if (
                 random.random() < self.conf["at_prob"]
@@ -138,4 +138,5 @@ class BetterIOPlugin(Star):
                     send_name = event.get_sender_name()
                     end_seg.text = f"@{send_name} {end_seg.text}"
                 else:
-                    chain.insert(0, Reply(id=message_id))
+                    chain.insert(0, At(qq=sender_id))
+                    
