@@ -11,8 +11,6 @@ from astrbot.api.star import Context, Star, register
 from astrbot.core import AstrBotConfig
 from astrbot.core.message.components import (
     At,
-    Face,
-    Image,
     Plain,
     Reply,
 )
@@ -91,39 +89,45 @@ class BetterIOPlugin(Star):
                     return
 
         # 过滤不支持的消息类型
-        if not all(isinstance(comp, Plain | Image | Face) for comp in chain):
+        if not chain or not isinstance(chain[-1], Plain):
             return
+
+        # 仅处理文本组件
+        seg = chain[-1]
+
+        if not seg.text.strip():
+            return
+
 
         # 清洗文本消息
         cconf = self.conf["clean"]
-        end_seg = chain[-1]
-        if isinstance(end_seg, Plain) and len(end_seg.text) < cconf["text_threshold"]:
+        if len(seg.text) < cconf["text_threshold"]:
             # 1.摘掉开头的 [At:xxx] 或 [At：xxx]
             if cconf["format_at"]:
-                end_seg.text = re.sub(r"^\[At[:：][^\]]+]\s*", "", end_seg.text)
+                seg.text = re.sub(r"^\[At[:：][^\]]+]\s*", "", seg.text)
                 logger.debug("已摘掉开头的 [At:xxx]")
 
             # 2.把开头的“@xxx ”（含中英文空格）整体摘掉
             if cconf["fake_at"]:
-                end_seg.text = re.sub(r"^@\S+\s*", "", end_seg.text)
+                seg.text = re.sub(r"^@\S+\s*", "", seg.text)
                 logger.debug("已摘掉开头的 @xxx ")
 
             # 3.清洗emoji
             if cconf["emoji"]:
-                end_seg.text = emoji.replace_emoji(end_seg.text, replace="")
+                seg.text = emoji.replace_emoji(seg.text, replace="")
             # 4.去除指定开头字符
             if cconf["lead"]:
                 for remove_lead in cconf["lead"]:
-                    if end_seg.text.startswith(remove_lead):
-                        end_seg.text = end_seg.text[len(remove_lead) :]
+                    if seg.text.startswith(remove_lead):
+                        seg.text = seg.text[len(remove_lead) :]
             # 5.去除指定结尾字符
             if cconf["tail"]:
                 for remove_tail in cconf["tail"]:
-                    if end_seg.text.endswith(remove_tail):
-                        end_seg.text = end_seg.text[: -len(remove_tail)]
+                    if seg.text.endswith(remove_tail):
+                        seg.text = seg.text[: -len(remove_tail)]
             # 6.整体清洗标点符号
             if cconf["punctuation"]:
-                end_seg.text = re.sub(cconf["punctuation"], "", end_seg.text)
+                seg.text = re.sub(cconf["punctuation"], "", seg.text)
 
         if event.get_platform_name() == "aiocqhttp":
             trigger_mid = event.message_obj.message_id
@@ -140,14 +144,12 @@ class BetterIOPlugin(Star):
             # 2.按概率@发送者
             if (
                 random.random() < rconf["at_prob"]
-                and isinstance(end_seg, Plain)
-                and end_seg.text.strip()
                 and not any(isinstance(item, At) for item in chain)
-                and not end_seg.text.startswith("@")
+                and not seg.text.startswith("@")
             ):
                 if rconf["str_at"]:
                     send_name = event.get_sender_name()
-                    end_seg.text = f"@{send_name} {end_seg.text}"
+                    seg.text = f"@{send_name} {seg.text}"
                     logger.debug("已插入假@")
                 else:
                     chain.insert(0, At(qq=event.get_sender_id()))
