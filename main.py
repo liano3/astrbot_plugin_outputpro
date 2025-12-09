@@ -1,8 +1,9 @@
 import random
 import re
+from collections import deque
 
 import emoji
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from astrbot import logger
 from astrbot.api.event import filter
@@ -20,8 +21,10 @@ from astrbot.core.platform.astr_message_event import AstrMessageEvent
 
 class GroupState(BaseModel):
     gid: str
-    last_msg: str = ""
-    # 未来的拓展属性
+    bot_msgs: deque = Field(
+        default_factory=lambda: deque(maxlen=5)
+    )  # Bot消息缓存，共5条
+    last_seen_mid: str = ""  # 群内最新消息的ID
 
 
 class StateManager:
@@ -36,20 +39,21 @@ class StateManager:
         return cls._groups[gid]
 
 
-@register(
-    "astrbot_plugin_outputpro",
-    "Zhalslar",
-    "输出增强插件：报错拦截、文本清洗、随机@、随机引用",
-    "1.0.1",
-)
+@register("astrbot_plugin_outputpro", "Zhalslar", "...", "...")
 class BetterIOPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.conf = config
-        self.clean = config["clean_config"]
+
+    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
+    async def on_message(self, event: AstrMessageEvent):
+        """接收消息后的处理"""
+        gid: str = event.get_group_id()
+        g: GroupState = StateManager.get_group(gid)
+        g.last_seen_mid = event.message_obj.message_id
 
     @filter.on_decorating_result(priority=15)
-    async def on_message(self, event: AstrMessageEvent):
+    async def on_decorating_result(self, event: AstrMessageEvent):
         """发送消息前的预处理"""
         # 过滤空消息
         result = event.get_result()
@@ -62,71 +66,75 @@ class BetterIOPlugin(Star):
         g: GroupState = StateManager.get_group(gid)
 
         # 拦截重复消息
-        if chain == g.last_msg:
+        msg = result.get_plain_text()
+        if msg in g.bot_msgs:
             event.stop_event()
             return
-        g.last_msg = event.message_str
+        g.bot_msgs.append(msg)
 
         # 拦截错误信息(根据关键词拦截)
-        if self.conf["intercept_error"] or not event.is_admin():
-            err_str = (
-                result.get_plain_text() if hasattr(result, "get_plain_text") else ""
-            )
-            if next(
-                (
-                    keyword
-                    for keyword in self.conf["error_keywords"]
-                    if keyword in err_str
-                ),
-                None,
-            ):
-                try:
+        if self.conf["intercept"]["block_error"] or not event.is_admin():
+            for word in self.conf["error_words"]:
+                if word in msg:
                     event.set_result(event.plain_result(""))
-                    logger.debug("已将回复内容替换为空消息")
-                except AttributeError:
                     event.stop_event()
-                    logger.debug("不支持 set_result，尝试使用 stop_event 阻止消息发送")
-                return
+                    logger.debug("已阻止错误消息发送")
+                    return
+
+        # 拦截人机发言
+        if self.conf["intercept"]["block_ai"]:
+            for word in self.conf["ai_words"]:
+                if word in msg:
+                    event.set_result(event.plain_result(""))
+                    event.stop_event()
+                    logger.debug("已阻止人机发言")
+                    return
 
         # 过滤不支持的消息类型
         if not all(isinstance(comp, Plain | Image | Face) for comp in chain):
             return
 
         # 清洗文本消息
+        cconf = self.conf["clean"]
         end_seg = chain[-1]
-        if (
-            isinstance(end_seg, Plain)
-            and len(end_seg.text) < self.clean["clean_text_length"]
-        ):
-            # 清洗emoji
-            if self.clean["clean_emoji"]:
+        if isinstance(end_seg, Plain) and len(end_seg.text) < cconf["text_threshold"]:
+            # 1.摘掉开头的 [At:xxx] 或 [At：xxx]
+            if cconf["format_at"]:
+                end_seg.text = re.sub(r"^\[At[:：][^\]]+]\s*", "", end_seg.text)
+
+            # 2.把开头的“@xxx ”（含中英文空格）整体摘掉
+            if cconf["fake_at"]:
+                end_seg.text = re.sub(r"^@\S+\s*", "", end_seg.text)
+
+            # 3.清洗emoji
+            if cconf["clean_emoji"]:
                 end_seg.text = emoji.replace_emoji(end_seg.text, replace="")
-            # 去除指定开头字符
-            if self.clean["remove_lead"]:
-                for remove_lead in self.clean["remove_lead"]:
+            # 4.去除指定开头字符
+            if cconf["lead"]:
+                for remove_lead in cconf["lead"]:
                     if end_seg.text.startswith(remove_lead):
                         end_seg.text = end_seg.text[len(remove_lead) :]
-            # 去除指定结尾字符
-            if self.clean["remove_tail"]:
-                for remove_tail in self.clean["remove_tail"]:
+            # 5.去除指定结尾字符
+            if cconf["tail"]:
+                for remove_tail in cconf["tail"]:
                     if end_seg.text.endswith(remove_tail):
                         end_seg.text = end_seg.text[: -len(remove_tail)]
-            # 清洗标点符号
-            if self.clean["clean_punctuation"]:
-                end_seg.text = re.sub(self.clean["clean_punctuation"], "", end_seg.text)
+            # 6.整体清洗标点符号
+            if cconf["punctuation"]:
+                end_seg.text = re.sub(cconf["punctuation"], "", end_seg.text)
 
-        # 随机附加At,引用回复
         if event.get_platform_name() == "aiocqhttp":
-            sender_id = event.get_sender_id()
-            message_id = event.message_obj.message_id
-            if not message_id:
-                return
-            # 按概率引用回复
-            if random.random() < self.conf["reply_prob"] and not any(
-                isinstance(item, Reply) for item in chain
+            trigger_mid = event.message_obj.message_id
+            rconf = self.conf["reat"]
+            # 1.消息被顶上去了, 则引用
+            if (
+                rconf["reply_switch"]
+                and not any(isinstance(item, Reply) for item in chain)
+                and trigger_mid != g.last_seen_mid
             ):
-                chain.insert(0, Reply(id=message_id))
-            # 按概率@发送者
+                chain.insert(0, Reply(id=trigger_mid))
+
+            # 2.按概率@发送者
             if (
                 random.random() < self.conf["at_prob"]
                 and isinstance(end_seg, Plain)
@@ -138,5 +146,4 @@ class BetterIOPlugin(Star):
                     send_name = event.get_sender_name()
                     end_seg.text = f"@{send_name} {end_seg.text}"
                 else:
-                    chain.insert(0, At(qq=sender_id))
-                    
+                    chain.insert(0, At(qq=event.get_sender_id()))
