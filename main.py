@@ -69,7 +69,7 @@ class BetterIOPlugin(Star):
         msg = result.get_plain_text()
         if msg in g.bot_msgs:
             event.set_result(event.plain_result(""))
-            logger.debug("已阻止重复消息发送")
+            logger.info("已阻止重复消息发送")
             return
         g.bot_msgs.append(msg)
 
@@ -79,7 +79,7 @@ class BetterIOPlugin(Star):
             for word in iconf["error_words"]:
                 if word in msg:
                     event.set_result(event.plain_result(""))
-                    logger.debug("已阻止错误消息发送")
+                    logger.info("已阻止错误消息发送")
                     return
 
         # 拦截人机发言
@@ -87,7 +87,7 @@ class BetterIOPlugin(Star):
             for word in iconf["ai_words"]:
                 if word in msg:
                     event.set_result(event.plain_result(""))
-                    logger.debug("已阻止人机发言")
+                    logger.info("已阻止人机发言")
                     return
 
         # 过滤不支持的消息类型
@@ -101,10 +101,12 @@ class BetterIOPlugin(Star):
             # 1.摘掉开头的 [At:xxx] 或 [At：xxx]
             if cconf["format_at"]:
                 end_seg.text = re.sub(r"^\[At[:：][^\]]+]\s*", "", end_seg.text)
+                logger.debug("已摘掉开头的 [At:xxx]")
 
             # 2.把开头的“@xxx ”（含中英文空格）整体摘掉
             if cconf["fake_at"]:
                 end_seg.text = re.sub(r"^@\S+\s*", "", end_seg.text)
+                logger.debug("已摘掉开头的 @xxx ")
 
             # 3.清洗emoji
             if cconf["emoji"]:
@@ -133,6 +135,7 @@ class BetterIOPlugin(Star):
                 and trigger_mid != g.last_seen_mid
             ):
                 chain.insert(0, Reply(id=trigger_mid))
+                logger.debug("已插入Reply组件")
 
             # 2.按概率@发送者
             if (
@@ -145,5 +148,7 @@ class BetterIOPlugin(Star):
                 if self.conf["enable_at_str"]:
                     send_name = event.get_sender_name()
                     end_seg.text = f"@{send_name} {end_seg.text}"
+                    logger.debug("已插入假@")
                 else:
                     chain.insert(0, At(qq=event.get_sender_id()))
+                    logger.debug("已插入At组件")
