@@ -69,6 +69,7 @@ class BetterIOPlugin(Star):
         msg = result.get_plain_text()
         if msg in g.bot_msgs:
             event.set_result(event.plain_result(""))
+            logger.debug("已阻止重复消息发送")
             return
         g.bot_msgs.append(msg)
 
