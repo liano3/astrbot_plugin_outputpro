@@ -4,7 +4,7 @@
         "type": "object",
         "hint": "",
         "items": {
-            "reread_block":{
+            "reread_block": {
                 "description": "拦截复读消息",
                 "type": "bool",
                 "hint": "打开后，若Bot当前要发送的消息和前5次发送的消息有重复的，则被拦截",
@@ -135,12 +135,12 @@
                 "description": "引用回复",
                 "type": "bool",
                 "hint": "当bot要回复的消息不是群里的最新消息时（被顶上去了），引用要回复的消息。 请提前关闭Astrbot自动的Reply功能",
-                "default": 0.1
+                "default": true
             },
             "at_prob": {
                 "description": "@发送者概率",
                 "type": "float",
-                "hint": "当消息中包含文本时，按概率@发送者。, 请提前关闭Astrbot自动的At功能",
+                "hint": "当消息中包含文本时，按概率@发送者。请提前关闭Astrbot自动的At功能",
                 "default": 0.001
             },
             "enable_at_str": {
