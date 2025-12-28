@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from astrbot import logger
 from astrbot.api.event import filter
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star
 from astrbot.core import AstrBotConfig
 from astrbot.core.message.components import (
     At,
@@ -30,8 +30,8 @@ class GroupState(BaseModel):
     """群号"""
     bot_msgs: deque = Field(default_factory=lambda: deque(maxlen=5))
     """Bot消息缓存"""
-    last_mid: str = ""
-    """群内最新消息的ID"""
+    after_bot_count: int = 0
+    """被顶了多少条消息"""
     name_to_qq: OrderedDict[str, str] = Field(default_factory=lambda: OrderedDict())
     """昵称 -> QQ"""
 
@@ -48,8 +48,7 @@ class StateManager:
         return cls._groups[gid]
 
 
-@register("astrbot_plugin_outputpro", "Zhalslar", "...", "...")
-class BetterIOPlugin(Star):
+class OutputPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.conf = config
@@ -78,13 +77,17 @@ class BetterIOPlugin(Star):
     async def on_message(self, event: AstrMessageEvent):
         """接收消息后的处理"""
         gid: str = event.get_group_id()
+        sender_id = event.get_sender_id()
+        self_id = event.get_self_id()
+
+        # 缓存最新消息ID
         g: GroupState = StateManager.get_group(gid)
-        g.last_mid = event.message_obj.message_id
+        if self.conf["reply_threshold"] and sender_id != self_id:
+            g.after_bot_count += 1
 
         # 缓存 “昵称 -> QQ”, 为解析假艾特提供映射
         if self.conf["parse_at"]:
             cache_name_num = 100  # 缓存数量默认100
-            sender_id = event.get_sender_id()
             sender_name = event.get_sender_name()
             if len(g.name_to_qq) >= cache_name_num:
                 g.name_to_qq.popitem(last=False)  # FIFO 头删
@@ -255,15 +258,17 @@ class BetterIOPlugin(Star):
                         chain[:] = [c for c in chain if not isinstance(c, At)]
 
             # 智能引用被顶的消息
-            if self.conf["smart_reply"]:
-                trigger_mid = event.message_obj.message_id
-
+            if self.conf["reply_threshold"] > 0:
+                # 当前事件也会使 g.after_bot_count 加 1，故要减 1
+                effective_count = g.after_bot_count - 1
                 if (
                     not any(isinstance(item, Reply) for item in chain)
-                    and trigger_mid != g.last_mid
+                    and effective_count >= self.conf["reply_threshold"] + 1
                 ):
-                    chain.insert(0, Reply(id=trigger_mid))
+                    chain.insert(0, Reply(id=event.message_obj.message_id))
                     logger.debug("已插入Reply组件")
+                # 重置计数器
+                g.after_bot_count = 0
 
             # 智能撤回
             if self.conf["recall"]["enable"]:

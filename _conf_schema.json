@@ -195,11 +195,16 @@
         },
         "default": 0.01
     },
-    "smart_reply": {
-        "description": "智能引用",
-        "hint": "第八步：智能地引用消息（仅aiocqhttp平台可用）。当bot要回复的消息不是群里的最新消息时（被顶上去了），引用要回复的消息。 请提前关闭Astrbot自动的Reply功能",
-        "type": "bool",
-        "default": true
+    "reply_threshold": {
+        "description": "引用阈值",
+        "hint": "第八步：智能地引用消息（仅aiocqhttp平台可用）。当bot要回复的消息被其他人插嘴了几条时，则引用要回复的消息。 设为 0 表示关闭引用功能, 请提前关闭Astrbot自动的Reply功能",
+        "type": "int",
+        "slider": {
+            "min": 0,
+            "max": 4,
+            "step": 1
+        },
+        "default": 1
     },
     "recall": {
         "description": "智能撤回",

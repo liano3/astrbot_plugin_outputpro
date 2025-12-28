@@ -5,7 +5,7 @@
 
 # astrbot_plugin_outputpro
 
-_✨ [astrbot](https://github.com/AstrBotDevs/AstrBot) 输出增强插件 ✨_  
+_✨ 输出增强插件 ✨_  
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
