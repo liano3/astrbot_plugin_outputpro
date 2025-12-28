@@ -112,9 +112,9 @@
         }
     },
     "parse_at": {
-        "description": "解析假艾特配置",
+        "description": "艾特配置",
         "type": "object",
-        "hint": "第五步：将消息中句首的假艾特转换成真艾特",
+        "hint": "第五步：将消息中句首的假艾特转换成真艾特, 再按概率保留或移除艾特",
         "default": true,
         "items": {
             "enable": {
@@ -128,6 +128,17 @@
                 "hint": "将解析到的真艾特重新转换成字符串艾特，即 @username xxx (如果发现真艾特与文本间的空格消失了，可以尝试开启此选项，开启后插件会用字符串形式保住空格)",
                 "type": "bool",
                 "default": true
+            },
+            "at_prob": {
+                "description": "艾特概率",
+                "hint": "随机值小于此值 → 必须带 @；随机值大于此值 → 必须不带 @。设为 0 则关闭此功能。请提前关闭Astrbot自动的At功能",
+                "type": "float",
+                "slider": {
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.001
+                },
+                "default": 0.01
             }
         }
     },
@@ -198,20 +209,9 @@
             }
         }
     },
-    "at_prob": {
-        "description": "艾特概率",
-        "hint": "第七步：按概率艾特别人（仅aiocqhttp平台可用）。随机值小于此值 → 必须带 @；随机值大于此值 → 必须不带 @。设为 0 则关闭此功能。请提前关闭Astrbot自动的At功能",
-        "type": "float",
-        "slider": {
-            "min": 0,
-            "max": 1,
-            "step": 0.001
-        },
-        "default": 0.01
-    },
     "reply_threshold": {
         "description": "引用阈值",
-        "hint": "第八步：智能地引用消息（仅aiocqhttp平台可用）。当bot要回复的消息被其他人插嘴了几条时，则引用要回复的消息。 设为 0 表示关闭引用功能, 请提前关闭Astrbot自动的Reply功能",
+        "hint": "第七步：智能地引用消息。当bot要回复的消息被其他人插嘴了几条时，则引用要回复的消息。 设为 0 表示关闭引用功能, 请提前关闭Astrbot自动的Reply功能",
         "type": "int",
         "slider": {
             "min": 0,
@@ -222,7 +222,7 @@
     },
     "recall": {
         "description": "智能撤回",
-        "hint": "第九步：检测发出的消息是否需要撤回，并执行撤回操作（仅aiocqhttp平台可用）。注意: 被判定为需要撤回的消息，将不会执行Astrbot自带的文转图、文转语音、合并转发、分段回复",
+        "hint": "第八步：检测发出的消息是否需要撤回，并执行撤回操作（仅aiocqhttp平台可用）。注意: 被判定为需要撤回的消息，将不会执行Astrbot自带的文转图、文转语音、合并转发、分段回复",
         "type": "object",
         "items": {
             "enable": {
