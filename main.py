@@ -47,6 +47,7 @@ class OutputPlugin(Star):
     async def _ensure_node_name(self, event: AstrMessageEvent) -> str:
         """确保转发节点昵称不为空"""
         fconf = self.conf["forward"]
+        print(fconf)
         if fconf.get("node_name"):
             return fconf["node_name"]
 
@@ -55,6 +56,7 @@ class OutputPlugin(Star):
         if isinstance(event, AiocqhttpMessageEvent):
             try:
                 login_data = await event.bot.get_login_info()
+                print(login_data)
                 nickname = login_data.get("nickname")
                 if nickname:
                     new_name = str(nickname)
@@ -207,13 +209,13 @@ class OutputPlugin(Star):
         if (
             isinstance(event, AiocqhttpMessageEvent)
             and self.conf["forward"]["enable"]
-            and len(chain) > 1
-            and isinstance(chain[1], Plain)
+            and isinstance(chain[-1], Plain)
         ):
-            if len(chain[1].text) > self.conf["forward"]["threshold"]:
+            seg = chain[-1]
+            if len(seg.text) > self.conf["forward"]["threshold"]:
                 nodes = Nodes([])
                 self_id = event.get_self_id()
-                name = self._ensure_node_name(event)
+                name = await self._ensure_node_name(event)
                 for seg in chain:
                     nodes.nodes.append(Node(uin=self_id, name=name, content=[seg]))
                 chain[:] = [nodes]
