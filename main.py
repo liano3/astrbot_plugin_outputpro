@@ -57,8 +57,12 @@ class OutputPlugin(Star):
                 import pillowmd
                 style_path = Path(self.conf["t2i"]["pillowmd_style_dir"]).resolve()
                 self.style = pillowmd.LoadMarkdownStyles(style_path)
+            except ImportError as e:
+                logger.error(
+                    f"无法加载 pillowmd：未安装 pillowmd 包。请先安装依赖，例如：pip install pillowmd : {e}"
+                )
             except Exception as e:
-                logger.error(f"无法加载pillowmd样式：{e}")
+                logger.error(f"无法加载 pillowmd 样式：{e}")
 
     async def terminate(self):
         # 终止撤回器
@@ -71,9 +75,9 @@ class OutputPlugin(Star):
         ):
             try:
                 shutil.rmtree(self.image_cache_dir)
-                logger.debug(f"[BoxPlugin] 缓存已清空：{self.image_cache_dir}")
+                logger.debug(f"缓存已清空：{self.image_cache_dir}")
             except Exception as e:
-                logger.error(f"[BoxPlugin] 清空缓存失败：{e}")
+                logger.error(f"清空缓存失败：{e}")
             self.image_cache_dir.mkdir(parents=True, exist_ok=True)
 
     async def _ensure_node_name(self, event: AstrMessageEvent) -> str:
