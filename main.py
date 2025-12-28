@@ -241,13 +241,17 @@ class OutputPlugin(Star):
                 and len(chain[0].text) < self.conf["tts"]["threshold"]
                 and random.random() < self.conf["tts"]["prob"]
             ):
-                character_id = self.conf["tts"]["character"].split("（", 1)[1][:-1]
-                audio_path = await event.bot.get_ai_record(
-                    character=character_id,
-                    group_id=int(self.conf["tts"]["group_id"]),
-                    text=chain[0].text,
-                )
-                chain[:] = [Record.fromURL(audio_path)]
+                try:
+                    character_id = self.conf["tts"]["character"].split("（", 1)[1][:-1]
+                    audio_path = await event.bot.get_ai_record(
+                        character=character_id,
+                        group_id=int(self.conf["tts"]["group_id"]),
+                        text=chain[0].text,
+                    )
+                    chain[:] = [Record.fromURL(audio_path)]
+                except Exception as e:
+                    logger.error(f"语音生成失败：{e}")
+
 
             # 智能引用
             if (
