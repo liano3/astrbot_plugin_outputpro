@@ -43,18 +43,21 @@ class AtPolicy:
         if not self.conf["parse_at"]["enable"]:
             return
 
-        insert_idx = 0
-        for i, c in enumerate(chain):
-            if isinstance(c, Plain):
-                insert_idx = i
-                break
+        display = nickname or qq
 
-        if self.conf["parse_at"]["at_str"]:
-            display = nickname or qq
-            chain.insert(insert_idx, Plain(f"@{display} "))
-        else:
-            chain.insert(insert_idx, At(qq=qq))
-            chain.insert(insert_idx + 1, Plain("\u200b"))
+        # 找第一个 Plain
+        for i, seg in enumerate(chain):
+            if not isinstance(seg, Plain):
+                continue
+
+            if self.conf["parse_at"]["at_str"]:
+                # 原地修改
+                seg.text = f"@{display} " + seg.text
+            else:
+                # 真 At：插在 Plain 前
+                chain.insert(i, At(qq=qq))
+                chain.insert(i + 1, Plain("\u200b"))
+            return
 
     # -------------------------
     # 假 at 解析（只读）

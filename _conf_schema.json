@@ -220,13 +220,42 @@
         },
         "default": 1
     },
-    "recall": {
-        "description": "智能撤回",
-        "hint": "第八步：检测发出的消息是否需要撤回，并执行撤回操作（仅aiocqhttp平台可用）。注意: 被判定为需要撤回的消息，将不会执行Astrbot自带的文转图、文转语音、合并转发、分段回复",
+    "forward":{
+        "description": "自动转发配置",
+        "hint": "第八步：检测发出的消息是否需要转发，并执行转发操作（仅aiocqhttp平台可用）",
         "type": "object",
         "items": {
             "enable": {
-                "description": "是否开启自动撤回",
+                "description": "开启自动转发",
+                "type": "bool",
+                "default": true
+            },
+            "threshold": {
+                "description": "触发转发的文本长度阈值",
+                "hint": "转发长度超过此阈值时执行转发操作",
+                "type": "int",
+                "slider": {
+                    "min": 0,
+                    "max": 1000,
+                    "step": 50
+                },
+                "default": 150
+            },
+            "node_name": {
+                "description": "转发节点昵称",
+                "hint": "转发消息时使用的昵称，不填则自动获取bot的昵称来显示",
+                "type": "string",
+                "default": ""
+            }
+        }
+    },
+    "recall": {
+        "description": "自动撤回配置",
+        "hint": "第九步：检测发出的消息是否需要撤回，并执行撤回操作（仅aiocqhttp平台可用）。注意: 被判定为需要撤回的消息，将不会执行Astrbot自带的文转图、文转语音、合并转发、分段回复",
+        "type": "object",
+        "items": {
+            "enable": {
+                "description": "开启自动撤回",
                 "type": "bool",
                 "default": false
             },
@@ -239,17 +268,6 @@
                     "我叫",
                     "我住在"
                 ]
-            },
-            "max_plain_len": {
-                "description": "触发撤回的文本长度阈值",
-                "hint": "消息文本字数阈值，超过此值时触发自动撤回操作",
-                "type": "int",
-                "slider": {
-                    "min": 10,
-                    "max": 1000,
-                    "step": 10
-                },
-                "default": 50
             },
             "delay": {
                 "description": "撤回延时",

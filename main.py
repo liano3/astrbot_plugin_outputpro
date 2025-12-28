@@ -11,6 +11,8 @@ from astrbot.core.message.components import (
     At,
     Face,
     Image,
+    Node,
+    Nodes,
     Plain,
     Reply,
 )
@@ -42,6 +44,28 @@ class OutputPlugin(Star):
     async def terminate(self):
         await self.recaller.terminate()
 
+    async def _ensure_node_name(self, event: AstrMessageEvent) -> str:
+        """确保转发节点昵称不为空"""
+        fconf = self.conf["forward"]
+        if fconf.get("node_name"):
+            return fconf["node_name"]
+
+        new_name = "AstrBot"
+
+        if isinstance(event, AiocqhttpMessageEvent):
+            try:
+                login_data = await event.bot.get_login_info()
+                nickname = login_data.get("nickname")
+                if nickname:
+                    new_name = str(nickname)
+            except Exception:
+                pass
+
+        fconf["node_name"] = new_name
+        self.conf.save_config()
+
+        return new_name
+
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def on_message(self, event: AstrMessageEvent):
         """接收消息后的处理"""
@@ -61,7 +85,6 @@ class OutputPlugin(Star):
             if len(g.name_to_qq) >= cache_name_num:
                 g.name_to_qq.popitem(last=False)  # FIFO 头删
             g.name_to_qq[sender_name] = sender_id
-
 
     @filter.on_decorating_result(priority=15)
     async def on_decorating_result(self, event: AstrMessageEvent):
@@ -168,7 +191,6 @@ class OutputPlugin(Star):
                 if cconf["punctuation"]:
                     seg.text = re.sub(cconf["punctuation"], "", seg.text)
 
-
         # 智能引用
         if (
             all(isinstance(seg, Plain | Image | Face | At) for seg in chain)
@@ -181,7 +203,21 @@ class OutputPlugin(Star):
             # 重置计数器
             g.after_bot_count = 0
 
+        # 自动转发
+        if (
+            isinstance(event, AiocqhttpMessageEvent)
+            and self.conf["forward"]["enable"]
+            and len(chain) > 1
+            and isinstance(chain[1], Plain)
+        ):
+            if len(chain[1].text) > self.conf["forward"]["threshold"]:
+                nodes = Nodes([])
+                self_id = event.get_self_id()
+                name = self._ensure_node_name(event)
+                for seg in chain:
+                    nodes.nodes.append(Node(uin=self_id, name=name, content=[seg]))
+                chain[:] = [nodes]
 
-        # 智能撤回
+        # 自动撤回
         if isinstance(event, AiocqhttpMessageEvent) and self.conf["recall"]["enable"]:
             await self.recaller.send_and_recall(event)
