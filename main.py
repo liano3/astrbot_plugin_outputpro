@@ -408,7 +408,7 @@ class OutputPlugin(Star):
             return None
 
         pushed = len(queue) - queue.index(msg_id) - 1
-        if pushed >= self.conf["reply_threshold"]:
+        if pushed >= self.conf["reply"]["threshold"]:
             chain.insert(0, Reply(id=msg_id))
             queue.clear()
 
