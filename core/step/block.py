@@ -14,7 +14,7 @@ class BlockStep(BaseStep):
 
     # ================== 各类拦截 ==================
 
-    async def _block_timeout(self, ctx: OutContext) -> StepResult:
+    async def _block_timeout(self, ctx: OutContext) -> StepResult | None:
         if int(time.time()) - ctx.timestamp > self.cfg.timeout:
             ctx.event.set_result(ctx.event.plain_result(""))
             return StepResult(
@@ -25,7 +25,6 @@ class BlockStep(BaseStep):
         if ctx.is_llm:
             ctx.group.bot_msgs.append(ctx.plain)
 
-        return StepResult()
 
     async def _block_dedup(self, ctx: OutContext) -> StepResult | None:
         if ctx.plain in ctx.group.bot_msgs:
@@ -38,8 +37,6 @@ class BlockStep(BaseStep):
         if ctx.is_llm:
             ctx.group.bot_msgs.append(ctx.plain)
 
-        return None
-
     async def _block_ai(self, ctx: OutContext) -> StepResult | None:
         for word in self.cfg.ai_words:
             if word in ctx.plain:
@@ -48,8 +45,6 @@ class BlockStep(BaseStep):
                     abort=True,
                     message=f"已拦截人机话术: {ctx.plain}",
                 )
-
-        return None
 
     # ================== 主入口 ==================
 
