@@ -19,7 +19,7 @@ class ForwardStep(BaseStep):
     def __init__(self, config: PluginConfig):
         super().__init__(config)
         self.cfg = config.forward
-        self.node_name: str | None = None
+        self.node_name: str = self.cfg.node_name
 
     async def _ensure_node_name(self, event: AstrMessageEvent):
         if not self.node_name and isinstance(event, AiocqhttpMessageEvent):
