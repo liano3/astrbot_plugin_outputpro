@@ -14,7 +14,7 @@ from astrbot.api.message_components import (
 )
 
 from ..config import PluginConfig
-from ..model import OutContext, StepName
+from ..model import OutContext, StepName, StepResult
 from .base import BaseStep
 
 
@@ -85,7 +85,7 @@ class SplitStep(BaseStep):
         delay = min_delay + (max_delay - min_delay) * ratio
         return delay
 
-    async def handle(self, ctx: OutContext):
+    async def handle(self, ctx: OutContext) -> StepResult:
         """
         对消息进行拆分并发送。
         最后一段会回填到原 chain 中。
@@ -93,7 +93,7 @@ class SplitStep(BaseStep):
         segments = self.split_chain(ctx.chain)
 
         if len(segments) <= 1:
-            return
+            return StepResult()
 
         logger.debug(f"[Splitter] 消息被分为 {len(segments)} 段")
 
@@ -118,6 +118,8 @@ class SplitStep(BaseStep):
         ctx.chain.clear()
         if not segments[-1].is_empty:
             ctx.chain.extend(segments[-1].components)
+
+        return StepResult()
 
     def split_chain(self, chain: list[BaseMessageComponent]) -> list[Segment]:
         """

@@ -1,4 +1,3 @@
-
 from astrbot.core.message.components import (
     Node,
     Nodes,
@@ -10,46 +9,41 @@ from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
 )
 
 from ..config import PluginConfig
-from ..model import OutContext, StepName
+from ..model import OutContext, StepName, StepResult
 from .base import BaseStep
 
 
 class ForwardStep(BaseStep):
     name = StepName.FORWARD
+
     def __init__(self, config: PluginConfig):
         super().__init__(config)
         self.cfg = config.forward
+        self.node_name: str | None = None
 
-    async def _ensure_node_name(self, event: AstrMessageEvent) -> str:
-        if self.cfg.node_name:
-            return self.cfg.node_name
-
-        new_name = "AstrBot"
-        if isinstance(event, AiocqhttpMessageEvent):
+    async def _ensure_node_name(self, event: AstrMessageEvent):
+        if not self.node_name and isinstance(event, AiocqhttpMessageEvent):
             try:
                 info = await event.bot.get_login_info()
-                if info.get("nickname"):
-                    new_name = str(info["nickname"])
+                if nickname := info.get("nickname"):
+                    self.node_name = str(nickname)
             except Exception:
                 pass
+        if not self.node_name:
+            self.node_name = "AstrBot"
+        return self.node_name
 
-        self.cfg.node_name = new_name
-        self.plugin_config.save()
-        return new_name
-
-    async def handle(self, ctx: OutContext):
-        if not isinstance(ctx.event, AiocqhttpMessageEvent):
-            return None
-        if not isinstance(ctx.chain[-1], Plain):
-            return None
-        if len(ctx.chain[-1].text) <= self.cfg.threshold:
-            return None
+    async def handle(self, ctx: OutContext) -> StepResult:
+        if (
+            not isinstance(ctx.event, AiocqhttpMessageEvent)
+            or not isinstance(ctx.chain[-1], Plain)
+            or len(ctx.chain[-1].text) <= self.cfg.threshold
+        ):
+            return StepResult()
 
         nodes = Nodes([])
         name = await self._ensure_node_name(ctx.event)
         content = list(ctx.chain.copy())
         nodes.nodes.append(Node(uin=ctx.bid, name=name, content=content))
         ctx.chain[:] = [nodes]
-        return None
-
-
+        return StepResult()

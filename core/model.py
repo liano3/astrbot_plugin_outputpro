@@ -1,6 +1,7 @@
 from collections import OrderedDict, deque
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -60,3 +61,15 @@ class StepName(str, Enum):
     FORWARD = "forward"
     RECALL = "recall"
     SPLIT = "split"
+
+
+@dataclass(slots=True)
+class StepResult:
+    ok: bool = True
+    """步骤是否成功"""
+    abort: bool = False
+    """是否需要中断处理"""
+    message: str | None = None
+    """附加消息"""
+    data: Any | None = None
+    """携带的上下文信息"""

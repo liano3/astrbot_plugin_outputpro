@@ -11,7 +11,7 @@ from astrbot.core.message.components import (
 )
 
 from ..config import PluginConfig
-from ..model import OutContext, StepName
+from ..model import OutContext, StepName, StepResult
 from .base import BaseStep
 
 
@@ -107,7 +107,7 @@ class AtStep(BaseStep):
     # -------------------------
     # 主入口
     # -------------------------
-    async def handle(self, ctx: OutContext):
+    async def handle(self, ctx: OutContext) -> StepResult:
         # ===== 1. 假艾特解析 =====
         idx, qq, nickname = self._parse_fake_at(ctx)
         self._apply_fake_at(ctx.chain, idx, qq, nickname)
@@ -117,7 +117,7 @@ class AtStep(BaseStep):
             self.cfg.at_prob > 0
             and all(isinstance(c, Plain | Image | Face | At | Reply) for c in ctx.chain)
         ):
-            return
+            return StepResult()
 
         has_at = self._has_at(ctx.chain)
         hit = random.random() < self.cfg.at_prob
@@ -142,3 +142,5 @@ class AtStep(BaseStep):
                         continue
                 new_chain.append(c)
             ctx.chain[:] = new_chain
+
+        return StepResult()

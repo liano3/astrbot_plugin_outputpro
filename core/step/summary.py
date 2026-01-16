@@ -14,7 +14,7 @@ from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
 )
 
 from ..config import PluginConfig
-from ..model import OutContext, StepName
+from ..model import OutContext, StepName, StepResult
 from .base import BaseStep
 
 
@@ -48,14 +48,14 @@ class SummaryStep(BaseStep):
         return quotes
 
 
-    async def handle(self, ctx: OutContext):
+    async def handle(self, ctx: OutContext) -> StepResult:
         """图片外显（直接发送并中断流水线）"""
         if (
             not isinstance(ctx.event, AiocqhttpMessageEvent)
             or len(ctx.chain) != 1
             or not isinstance(ctx.chain[0], Image)
         ):
-            return None
+            return StepResult()
 
         obmsg = await ctx.event._parse_onebot_json(MessageChain(ctx.chain))
         obmsg[0]["data"]["summary"] = random.choice(self.quotes)
@@ -63,4 +63,6 @@ class SummaryStep(BaseStep):
         await ctx.event.bot.send(ctx.event.message_obj.raw_message, obmsg)  # type: ignore
         ctx.event.should_call_llm(True)
         ctx.chain.clear()
+
+        return StepResult()
 

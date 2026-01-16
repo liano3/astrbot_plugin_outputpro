@@ -7,7 +7,7 @@ from astrbot.core.message.components import (
 )
 
 from ..config import PluginConfig
-from ..model import OutContext, StepName
+from ..model import OutContext, StepName, StepResult
 from .base import BaseStep
 
 
@@ -18,21 +18,21 @@ class ReplyStep(BaseStep):
         super().__init__(config)
         self.cfg = config.reply
 
-    async def handle(self, ctx: OutContext):
+    async def handle(self, ctx: OutContext) -> StepResult:
         if self.cfg.threshold <= 0:
-            return None
+            return StepResult()
 
         if not all(isinstance(x, Plain | Image | Face | At) for x in ctx.chain):
-            return None
+            return StepResult()
 
         msg_id = ctx.event.message_obj.message_id
         queue = ctx.group.msg_queue
         if msg_id not in queue:
-            return None
+            return StepResult()
 
         pushed = len(queue) - queue.index(msg_id) - 1
         if pushed >= self.cfg.threshold:
             ctx.chain.insert(0, Reply(id=msg_id))
             queue.clear()
 
-        return None
+        return StepResult()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeAlias
+from astrbot.api import logger
 
 from .config import PluginConfig
 from .model import OutContext
@@ -19,8 +19,6 @@ from .step import (
     T2IStep,
     TTSStep,
 )
-
-StepResult: TypeAlias = bool | None
 
 
 class Pipeline:
@@ -59,7 +57,7 @@ class Pipeline:
         """
         根据配置构建步骤实例（默认顺序或自定义顺序）
         """
-        if self.cfg.lock_order:  # 使用默认顺序
+        if self.cfg.lock_order:
             for name, cls in self.STEP_REGISTRY:
                 if name in self.cfg._steps:
                     step = cls(self.plugin_config)
@@ -73,7 +71,6 @@ class Pipeline:
                 step = cls(self.plugin_config)
                 self._steps.append(step)
 
-
     # =================== Lifecycle =======================
 
     async def initialize(self) -> None:
@@ -85,7 +82,6 @@ class Pipeline:
         """终止所有步骤"""
         for step in self._steps:
             await step.terminate()
-
 
     # ==================== run =====================
 
@@ -100,8 +96,14 @@ class Pipeline:
             if not self._llm_allow(step, ctx.is_llm):
                 continue
 
-            ret = await step.handle(ctx)
-            if ret is False:
+            result = await step.handle(ctx)
+            if result.message:
+                if result.ok:
+                    logger.debug(result.message)
+                else:
+                    logger.warning(result.message)
+
+            if result.abort:
                 return False
 
         return True

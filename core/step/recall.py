@@ -21,7 +21,7 @@ from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
 )
 
 from ..config import PluginConfig
-from ..model import OutContext, StepName
+from ..model import OutContext, StepName, StepResult
 from .base import BaseStep
 
 
@@ -71,21 +71,21 @@ class RecallStep(BaseStep):
         except Exception as e:
             logger.error(f"撤回消息失败: {e}")
 
-    async def handle(self, ctx: OutContext):
+    async def handle(self, ctx: OutContext) -> StepResult:
         """对外接口：发消息并撤回"""
         if not isinstance(ctx.event, AiocqhttpMessageEvent):
-            return
+            return StepResult()
         if not any(
             isinstance(
                 seg, Plain | Image | Video | Face | At | AtAll | Forward | Reply | Nodes
             )
             for seg in ctx.chain
         ):
-            return
+            return StepResult()
 
         # 判断消息是否需要撤回
         if not self._is_recall(ctx.chain):
-            return
+            return StepResult()
 
         ctx.event.should_call_llm(True)
         obmsg = await ctx.event._parse_onebot_json(MessageChain(chain=ctx.chain))
@@ -109,3 +109,4 @@ class RecallStep(BaseStep):
 
         # 清空原消息链
         ctx.chain.clear()
+        return StepResult()

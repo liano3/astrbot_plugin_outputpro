@@ -25,6 +25,7 @@ class OutputPlugin(Star):
 
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def on_message(self, event: AstrMessageEvent):
+        """收到群消息时"""
         gid = event.get_group_id()
         sender_id = event.get_sender_id()
         self_id = event.get_self_id()
@@ -42,6 +43,7 @@ class OutputPlugin(Star):
 
     @filter.on_decorating_result(priority=15)
     async def on_decorating_result(self, event: AstrMessageEvent):
+        """发送消息前"""
         result = event.get_result()
         if not result or not result.chain:
             return

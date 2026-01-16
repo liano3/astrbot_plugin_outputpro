@@ -1,54 +1,66 @@
 import time
 
-from astrbot.api import logger
-
 from ..config import PluginConfig
-from ..model import OutContext, StepName
+from ..model import OutContext, StepName, StepResult
 from .base import BaseStep
 
 
 class BlockStep(BaseStep):
     name = StepName.BLOCK
+
     def __init__(self, config: PluginConfig):
         super().__init__(config)
         self.cfg = config.block
 
+    # ================== 各类拦截 ==================
 
-    async def _block_timeout(self, ctx: OutContext):
+    async def _block_timeout(self, ctx: OutContext) -> StepResult:
         if int(time.time()) - ctx.timestamp > self.cfg.timeout:
             ctx.event.set_result(ctx.event.plain_result(""))
-            logger.warning(f"已拦截超时消息: {ctx.plain}")
-            return False
+            return StepResult(
+                abort=True,
+                message=f"已拦截超时消息: {ctx.plain}",
+            )
 
         if ctx.is_llm:
             ctx.group.bot_msgs.append(ctx.plain)
 
-        return None
+        return StepResult()
 
-    async def _block_dedup(self, ctx: OutContext):
+    async def _block_dedup(self, ctx: OutContext) -> StepResult | None:
         if ctx.plain in ctx.group.bot_msgs:
             ctx.event.set_result(ctx.event.plain_result(""))
-            logger.warning(f"已拦截重复消息: {ctx.plain}")
-            return False
+            return StepResult(
+                abort=True,
+                message=f"已拦截超时消息: {ctx.plain}",
+            )
 
         if ctx.is_llm:
             ctx.group.bot_msgs.append(ctx.plain)
 
         return None
 
-    async def _block_ai(self, ctx: OutContext):
+    async def _block_ai(self, ctx: OutContext) -> StepResult | None:
         for word in self.cfg.ai_words:
             if word in ctx.plain:
                 ctx.event.set_result(ctx.event.plain_result(""))
-                logger.warning(f"已拦截人机话术: {ctx.plain}")
-                return False
+                return StepResult(
+                    abort=True,
+                    message=f"已拦截人机话术: {ctx.plain}",
+                )
 
         return None
 
-    async def handle(self, ctx: OutContext):
-        if await self._block_timeout(ctx) is False:
-            return False
-        if await self._block_dedup(ctx) is False:
-            return False
-        if await self._block_ai(ctx) is False:
-            return False
+    # ================== 主入口 ==================
+
+    async def handle(self, ctx: OutContext) -> StepResult:
+        for checker in (
+            self._block_timeout,
+            self._block_dedup,
+            self._block_ai,
+        ):
+            result = await checker(ctx)
+            if result is not None:
+                return result
+
+        return StepResult()

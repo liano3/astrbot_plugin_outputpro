@@ -5,7 +5,7 @@ from astrbot import logger
 from astrbot.core.message.components import Image, Plain
 
 from ..config import PluginConfig
-from ..model import OutContext, StepName
+from ..model import OutContext, StepName, StepResult
 from .base import BaseStep
 
 
@@ -28,15 +28,7 @@ class T2IStep(BaseStep):
         except Exception as e:
             logger.error(f"加载 pillowmd 失败: {e}")
 
-    async def clear_cache(self):
-        if self.cfg.clean_cache and self.image_cache_dir.exists():
-            try:
-                shutil.rmtree(self.image_cache_dir)
-            except Exception as e:
-                logger.error(f"清理缓存失败: {e}")
-            self.image_cache_dir.mkdir(parents=True, exist_ok=True)
-
-    async def handle(self, ctx: OutContext):
+    async def handle(self, ctx: OutContext) -> StepResult:
 
         if (
             isinstance(ctx.chain[-1], Plain)
@@ -51,4 +43,12 @@ class T2IStep(BaseStep):
                 )
                 path = img.Save(self.image_cache_dir)
                 ctx.chain[-1] = Image.fromFileSystem(str(path))
+        return StepResult()
 
+    async def terminate(self):
+        if self.cfg.clean_cache and self.image_cache_dir.exists():
+            try:
+                shutil.rmtree(self.image_cache_dir)
+            except Exception as e:
+                logger.error(f"清理缓存失败: {e}")
+            self.image_cache_dir.mkdir(parents=True, exist_ok=True)

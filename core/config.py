@@ -79,7 +79,7 @@ class PipelineConfig(Section):
 
 class SummaryConfig(Section):
     quotes: list[str]
-    quotes_files: str
+    quotes_files: list[str]
 
 
 class ErrorConfig(Section):
@@ -193,6 +193,8 @@ class TypedConfigFacade:
     def __getattr__(self, key: str) -> Any:
         return self._cfg[key]
 
+    def save(self):
+        self._cfg.save_config()
 
 # ==================================================
 # 插件配置入口

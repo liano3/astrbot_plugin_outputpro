@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from ..config import PluginConfig
-from ..model import OutContext, StepName
+from ..model import OutContext, StepName, StepResult
 
 
 class BaseStep(ABC):
@@ -17,7 +17,7 @@ class BaseStep(ABC):
         self.plugin_config = config
 
     @abstractmethod
-    async def handle(self, ctx: OutContext) -> None:
+    async def handle(self, ctx: OutContext) -> StepResult:
         """
         处理单次步骤的核心逻辑。
 

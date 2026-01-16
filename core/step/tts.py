@@ -7,7 +7,7 @@ from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
 )
 
 from ..config import PluginConfig
-from ..model import OutContext, StepName
+from ..model import OutContext, StepName, StepResult
 from .base import BaseStep
 
 
@@ -18,9 +18,9 @@ class TTSStep(BaseStep):
         self.cfg = config.tts
         self.style = None
 
-    async def handle(self, ctx: OutContext):
+    async def handle(self, ctx: OutContext) -> StepResult:
         if not isinstance(ctx.event, AiocqhttpMessageEvent):
-            return None
+            return StepResult()
 
         if (
             len(ctx.chain) != 1
@@ -28,7 +28,7 @@ class TTSStep(BaseStep):
             or len(ctx.chain[0].text) >= self.cfg.threshold
             or random.random() >= self.cfg.prob
         ):
-            return None
+            return StepResult()
 
         try:
             audio = await ctx.event.bot.get_ai_record(
@@ -40,4 +40,4 @@ class TTSStep(BaseStep):
         except Exception as e:
             logger.error(f"TTS 失败: {e}")
 
-        return None
+        return StepResult()
