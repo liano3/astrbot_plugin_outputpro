@@ -10,12 +10,16 @@ from astrbot.core.message.components import (
     Reply,
 )
 
-from .model import OutContext
+from ..config import PluginConfig
+from ..model import OutContext, StepName
+from .base import BaseStep
 
 
-class AtPolicy:
-    def __init__(self, config: dict):
-        self.conf = config
+class AtStep(BaseStep):
+    name = StepName.AT
+    def __init__(self, config: PluginConfig):
+        super().__init__(config)
+        self.cfg = config.at
 
         self.at_head_regex = re.compile(
             r"^\s*(?:"
@@ -43,7 +47,7 @@ class AtPolicy:
             if not isinstance(seg, Plain):
                 continue
 
-            if self.conf["parse_at"]["at_str"] and nickname:
+            if self.cfg.at_str and nickname:
                 # 原地修改
                 seg.text = f"@{nickname} " + seg.text
             else:
@@ -103,21 +107,20 @@ class AtPolicy:
     # -------------------------
     # 主入口
     # -------------------------
-    def handle(self, ctx: OutContext):
+    async def handle(self, ctx: OutContext):
         # ===== 1. 假艾特解析 =====
         idx, qq, nickname = self._parse_fake_at(ctx)
         self._apply_fake_at(ctx.chain, idx, qq, nickname)
 
         # ===== 2. 智能艾特 =====
-        at_prob = self.conf["parse_at"]["at_prob"]
         if not (
-            at_prob > 0
+            self.cfg.at_prob > 0
             and all(isinstance(c, Plain | Image | Face | At | Reply) for c in ctx.chain)
         ):
             return
 
         has_at = self._has_at(ctx.chain)
-        hit = random.random() < at_prob
+        hit = random.random() < self.cfg.at_prob
 
         # 命中 → 必须有 at
         if hit and not has_at and ctx.chain and isinstance(ctx.chain[0], Plain):

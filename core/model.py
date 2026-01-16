@@ -1,5 +1,6 @@
 from collections import OrderedDict, deque
 from dataclasses import dataclass
+from enum import Enum
 
 from pydantic import BaseModel, Field
 
@@ -42,3 +43,20 @@ class OutContext:
     uid: str
     bid: str
     group: GroupState
+    timestamp: int
+
+
+
+class StepName(str, Enum):
+    SUMMARY = "summary"
+    ERROR = "error"
+    BLOCK = "block"
+    AT = "at"
+    CLEAN = "clean"
+    REPLACE = "replace"
+    TTS = "tts"
+    T2I = "t2i"
+    REPLY = "reply"
+    FORWARD = "forward"
+    RECALL = "recall"
+    SPLIT = "split"

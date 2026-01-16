@@ -3,7 +3,6 @@ import asyncio
 from aiocqhttp import CQHttp
 
 from astrbot.api import logger
-from astrbot.core import AstrBotConfig
 from astrbot.core.message.components import (
     At,
     AtAll,
@@ -21,12 +20,16 @@ from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
     AiocqhttpMessageEvent,
 )
 
-from .model import OutContext
+from ..config import PluginConfig
+from ..model import OutContext, StepName
+from .base import BaseStep
 
 
-class Recaller:
-    def __init__(self, config: AstrBotConfig):
-        self.conf = config
+class RecallStep(BaseStep):
+    name = StepName.RECALL
+    def __init__(self, config: PluginConfig):
+        super().__init__(config)
+        self.cfg = config.recall
         self.recall_tasks: list[asyncio.Task] = []
 
     async def initialize(self):
@@ -50,7 +53,7 @@ class Recaller:
         for seg in chain:
             if isinstance(seg, Plain):
                 # 判断关键词
-                for word in self.conf["recall"]["keywords"]:
+                for word in self.cfg.keywords:
                     if word in seg.text:
                         return True
             elif isinstance(seg, Image):
@@ -60,7 +63,7 @@ class Recaller:
 
     async def _recall_msg(self, client: CQHttp, message_id: int = 1):
         """撤回消息"""
-        await asyncio.sleep(self.conf["recall"]["delay"])
+        await asyncio.sleep(self.cfg.delay)
         try:
             if message_id:
                 await client.delete_msg(message_id=message_id)
@@ -68,7 +71,7 @@ class Recaller:
         except Exception as e:
             logger.error(f"撤回消息失败: {e}")
 
-    async def send_and_recall(self, ctx: OutContext):
+    async def handle(self, ctx: OutContext):
         """对外接口：发消息并撤回"""
         if not isinstance(ctx.event, AiocqhttpMessageEvent):
             return

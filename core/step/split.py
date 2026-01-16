@@ -2,7 +2,7 @@ import asyncio
 import re
 from dataclasses import dataclass, field
 
-from astrbot.api import AstrBotConfig, logger
+from astrbot.api import logger
 from astrbot.api.event import MessageChain
 from astrbot.api.message_components import (
     At,
@@ -12,9 +12,10 @@ from astrbot.api.message_components import (
     Plain,
     Reply,
 )
-from astrbot.api.star import Context
 
-from .model import OutContext
+from ..config import PluginConfig
+from ..model import OutContext, StepName
+from .base import BaseStep
 
 
 @dataclass
@@ -45,29 +46,15 @@ class Segment:
         return not self.text.strip() and not self.has_media
 
 
-class MessageSplitter:
-    """
-    消息分段器
-    """
+class SplitStep(BaseStep):
+    name = StepName.SPLIT
 
-    def __init__(self, context: Context, config: AstrBotConfig):
-        self.context = context
-        sconf = config["split"]
-
-        # 用于 Plain 文本分割
-        self.split_pattern = self._build_split_pattern(sconf["char_list"])
+    def __init__(self, config: PluginConfig):
+        self.raw_config = config
+        self.cfg = config.split
 
         # 最大分段数（<=0 表示不限制）
-        self.max_count = sconf["max_count"]
-
-        # 解析字符串配置 "min,max" → [min, max]
-        try:
-            self.min_delay, self.max_delay = map(
-                float, sconf.get("typing_delay", "1.5,3.5").split(",")
-            )
-        except Exception as e:
-            logger.warning(f"解析 typing_delay 失败，使用默认值 1.5,3.5: {e}")
-            self.min_delay, self.max_delay = 1.5, 3.5
+        self.max_count = self.cfg.max_count
 
         # 最大文本长度归一化，用于映射到 min/max
         self._max_len_for_delay = 150
@@ -76,22 +63,6 @@ class MessageSplitter:
         tail_punc = ".,，。、;；:："
         self.tail_punc_re = re.compile(f"[{re.escape(tail_punc)}]+$")
 
-    def _build_split_pattern(self, char_list: list[str]) -> str:
-        """
-        char_list 来自前端配置，例如：
-        ["。", "？", "\\s", "\\n"]
-        """
-        tokens = []
-
-        for ch in char_list:
-            if ch == "\\n":
-                tokens.append("\n")
-            elif ch == "\\s":
-                tokens.append(r"\s")
-            else:
-                tokens.append(re.escape(ch))
-
-        return f"[{''.join(tokens)}]+"
 
     def _strip_last_plain(self, seg: Segment):
         """清掉 Segment 中语义最后一个非空 Plain 的句尾标点"""
@@ -108,12 +79,13 @@ class MessageSplitter:
         """
         if text_len <= 0:
             return 0.0
-
+        min_delay = self.cfg._min_delay
+        max_delay = self.cfg._max_delay
         ratio = min(text_len / self._max_len_for_delay, 1.0)
-        delay = self.min_delay + (self.max_delay - self.min_delay) * ratio
+        delay = min_delay + (max_delay - min_delay) * ratio
         return delay
 
-    async def split(self, ctx: OutContext):
+    async def handle(self, ctx: OutContext):
         """
         对消息进行拆分并发送。
         最后一段会回填到原 chain 中。
@@ -133,7 +105,7 @@ class MessageSplitter:
                 continue
 
             try:
-                await self.context.send_message(
+                await self.raw_config.context.send_message(
                     ctx.event.unified_msg_origin,
                     MessageChain(seg.components),
                 )
@@ -189,7 +161,7 @@ class MessageSplitter:
                     continue
 
                 # 按分隔符拆分
-                parts = re.split(f"({self.split_pattern})", text)
+                parts = re.split(f"({self.cfg._split_pattern})", text)
                 buf = ""
 
                 for part in parts:
@@ -197,7 +169,7 @@ class MessageSplitter:
                         continue
 
                     # 命中分隔符：形成一个完整 segment
-                    if re.fullmatch(self.split_pattern, part):
+                    if re.fullmatch(self.cfg._split_pattern, part):
                         buf += part
                         if buf:
                             if pending_prefix:
