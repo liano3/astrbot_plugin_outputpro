@@ -141,7 +141,7 @@
                     "max": 120,
                     "step": 1
                 },
-                "default": 30
+                "default": 0
             },
             "block_reread": {
                 "description": "拦截流口水的消息",
@@ -243,7 +243,7 @@
             },
             "emotion_tag": {
                 "description": "摘除情绪标签",
-                "hint": "即摘除消息中的 &&...&&",
+                "hint": "即摘除消息中的 &&...&&, 若不生效则可能是被其他插件干扰",
                 "type": "bool",
                 "default": true
             },
@@ -485,7 +485,6 @@
                 "default": [
                     "。",
                     "？",
-                    "\\s",
                     "\\n"
                 ]
             },
@@ -498,7 +497,7 @@
                     "max": 5,
                     "step": 1
                 },
-                "default": 3
+                "default": 2
             },
             "typing_delay": {
                 "description": "每段消息延迟范围（秒）",
