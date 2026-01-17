@@ -22,15 +22,12 @@ class BlockStep(BaseStep):
                 msg=f"已拦截超时消息: {ctx.plain}",
             )
 
-        if ctx.is_llm:
-            ctx.group.bot_msgs.append(ctx.plain)
-
     async def _block_dedup(self, ctx: OutContext) -> StepResult | None:
         if ctx.plain in ctx.group.bot_msgs:
             ctx.event.set_result(ctx.event.plain_result(""))
             return StepResult(
                 abort=True,
-                msg=f"已拦截超时消息: {ctx.plain}",
+                msg=f"已拦截流口水消息: {ctx.plain}",
             )
 
         if ctx.is_llm:
