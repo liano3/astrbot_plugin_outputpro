@@ -130,20 +130,31 @@ class AtStep(BaseStep):
                 qq=ctx.uid,
                 nickname=name,
             )
-            return StepResult(msg=f"已插入At组件(@{name})")
+            return StepResult(msg=f"已插入组件@{name}({ctx.uid})")
 
         # 未命中 → 清除所有 at
         elif not hit and has_at:
             new_chain = []
+            removed_at = ""
+
             for c in ctx.chain:
                 if isinstance(c, At):
+                    removed_at = f"@{c.name}"
                     continue
+
                 if isinstance(c, Plain):
+                    m = self.at_head_regex.search(c.text)
+                    if m:
+                        at_str = next(g for g in m.groups() if g is not None)
+                        removed_at = f"@{at_str}"
+
                     c.text = self.at_head_regex.sub("", c.text, count=1).strip()
                     if not c.text:
                         continue
+
                 new_chain.append(c)
+
             ctx.chain[:] = new_chain
-            return StepResult(msg="已移除了@头")
+            return StepResult(msg=removed_at)
 
         return StepResult()
