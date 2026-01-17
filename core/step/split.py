@@ -63,34 +63,12 @@ class SplitStep(BaseStep):
         tail_punc = ".,，。、;；:："
         self.tail_punc_re = re.compile(f"[{re.escape(tail_punc)}]+$")
 
-
-    def _strip_last_plain(self, seg: Segment):
-        """清掉 Segment 中语义最后一个非空 Plain 的句尾标点"""
-        for comp in reversed(seg.components):
-            if isinstance(comp, Plain) and comp.text.strip():
-                comp.text = self.tail_punc_re.sub("", comp.text)
-                break
-
-    def _calc_delay(self, text_len: int) -> float:
-        """
-        根据文本长度计算延迟（线性映射到 min_delay ~ max_delay）：
-        - 短文本 → 接近 min_delay
-        - 长文本 → 接近 max_delay
-        """
-        if text_len <= 0:
-            return 0.0
-        min_delay = self.cfg._min_delay
-        max_delay = self.cfg._max_delay
-        ratio = min(text_len / self._max_len_for_delay, 1.0)
-        delay = min_delay + (max_delay - min_delay) * ratio
-        return delay
-
     async def handle(self, ctx: OutContext) -> StepResult:
         """
         对消息进行拆分并发送。
         最后一段会回填到原 chain 中。
         """
-        segments = self.split_chain(ctx.chain)
+        segments = self._split_chain(ctx.chain)
 
         if len(segments) <= 1:
             return StepResult()
@@ -119,9 +97,30 @@ class SplitStep(BaseStep):
         if not segments[-1].is_empty:
             ctx.chain.extend(segments[-1].components)
 
-        return StepResult()
+        return StepResult(msg="分段回复完成")
 
-    def split_chain(self, chain: list[BaseMessageComponent]) -> list[Segment]:
+    def _strip_last_plain(self, seg: Segment):
+        """清掉 Segment 中语义最后一个非空 Plain 的句尾标点"""
+        for comp in reversed(seg.components):
+            if isinstance(comp, Plain) and comp.text.strip():
+                comp.text = self.tail_punc_re.sub("", comp.text)
+                break
+
+    def _calc_delay(self, text_len: int) -> float:
+        """
+        根据文本长度计算延迟（线性映射到 min_delay ~ max_delay）：
+        - 短文本 → 接近 min_delay
+        - 长文本 → 接近 max_delay
+        """
+        if text_len <= 0:
+            return 0.0
+        min_delay = self.cfg._min_delay
+        max_delay = self.cfg._max_delay
+        ratio = min(text_len / self._max_len_for_delay, 1.0)
+        delay = min_delay + (max_delay - min_delay) * ratio
+        return delay
+
+    def _split_chain(self, chain: list[BaseMessageComponent]) -> list[Segment]:
         """
         拆分核心逻辑
         """

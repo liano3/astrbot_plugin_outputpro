@@ -46,4 +46,4 @@ class ForwardStep(BaseStep):
         content = list(ctx.chain.copy())
         nodes.nodes.append(Node(uin=ctx.bid, name=name, content=content))
         ctx.chain[:] = [nodes]
-        return StepResult()
+        return StepResult(msg="已将消息转换为转发节点")

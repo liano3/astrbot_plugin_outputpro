@@ -27,6 +27,7 @@ from .base import BaseStep
 
 class RecallStep(BaseStep):
     name = StepName.RECALL
+
     def __init__(self, config: PluginConfig):
         super().__init__(config)
         self.cfg = config.recall
@@ -48,65 +49,64 @@ class RecallStep(BaseStep):
         except ValueError:
             pass
 
-    def _is_recall(self, chain: list[BaseMessageComponent]) -> bool:
-        """判断消息是否需撤回"""
+
+    def _is_recall(self, chain: list[BaseMessageComponent]) -> str | None:
+        """判断消息是否需撤回，并返回原因"""
         for seg in chain:
             if isinstance(seg, Plain):
-                # 判断关键词
                 for word in self.cfg.keywords:
                     if word in seg.text:
-                        return True
+                        return f"包含敏感关键词：{word}"
             elif isinstance(seg, Image):
-                # TODO: 判断色图
-                continue
-        return False
+                return "包含图片（暂未识别是否色图）"
+        return None
 
-    async def _recall_msg(self, client: CQHttp, message_id: int = 1):
+
+    async def _recall_msg(self, client: CQHttp, message_id: int, reason: str):
         """撤回消息"""
         await asyncio.sleep(self.cfg.delay)
         try:
-            if message_id:
-                await client.delete_msg(message_id=message_id)
-                logger.debug(f"已自动撤回消息: {message_id}")
+            await client.delete_msg(message_id=message_id)
+            logger.debug(f"已自动撤回消息: {message_id}，原因：{reason}")
         except Exception as e:
-            logger.error(f"撤回消息失败: {e}")
+            logger.error(f"撤回消息失败: {e}（原因：{reason}）")
+
 
     async def handle(self, ctx: OutContext) -> StepResult:
         """对外接口：发消息并撤回"""
-        if not isinstance(ctx.event, AiocqhttpMessageEvent):
-            return StepResult()
-        if not any(
+        if isinstance(ctx.event, AiocqhttpMessageEvent) and any(
             isinstance(
-                seg, Plain | Image | Video | Face | At | AtAll | Forward | Reply | Nodes
+                seg,
+                Plain | Image | Video | Face | At | AtAll | Forward | Reply | Nodes,
             )
             for seg in ctx.chain
         ):
-            return StepResult()
+            reason = self._is_recall(ctx.chain)
+            if reason:
+                ctx.event.should_call_llm(True)
+                obmsg = await ctx.event._parse_onebot_json(MessageChain(chain=ctx.chain))
+                client = ctx.event.bot
 
-        # 判断消息是否需要撤回
-        if not self._is_recall(ctx.chain):
-            return StepResult()
+                send_result = None
+                if ctx.gid:
+                    send_result = await client.send_group_msg(
+                        group_id=int(ctx.gid), message=obmsg
+                    )
+                elif ctx.uid:
+                    send_result = await client.send_private_msg(
+                        user_id=int(ctx.uid), message=obmsg
+                    )
 
-        ctx.event.should_call_llm(True)
-        obmsg = await ctx.event._parse_onebot_json(MessageChain(chain=ctx.chain))
-        client = ctx.event.bot
+                if send_result and (message_id := send_result.get("message_id")):
+                    task = asyncio.create_task(
+                        self._recall_msg(client, int(message_id), reason)
+                    )
+                    task.add_done_callback(self._remove_task)
+                    self.recall_tasks.append(task)
 
-        send_result = None
-        if ctx.gid:
-            send_result = await client.send_group_msg(
-                group_id=int(ctx.gid), message=obmsg
-            )
-        elif ctx.uid:
-            send_result = await client.send_private_msg(
-                user_id=int(ctx.uid), message=obmsg
-            )
+                ctx.chain.clear()
+                return StepResult(
+                    msg=f"已启动撤回任务（{reason}），将在 {self.cfg.delay} 秒后撤回消息"
+                )
 
-        # 启动撤回任务
-        if send_result and (message_id := send_result.get("message_id")):
-            task = asyncio.create_task(self._recall_msg(client, int(message_id)))  # type: ignore
-            task.add_done_callback(self._remove_task)
-            self.recall_tasks.append(task)
-
-        # 清空原消息链
-        ctx.chain.clear()
         return StepResult()

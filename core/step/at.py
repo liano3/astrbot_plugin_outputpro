@@ -124,11 +124,13 @@ class AtStep(BaseStep):
 
         # 命中 → 必须有 at
         if hit and not has_at and ctx.chain and isinstance(ctx.chain[0], Plain):
+            name = ctx.event.get_sender_name()
             self._insert_at(
                 ctx.chain,
                 qq=ctx.uid,
-                nickname=ctx.event.get_sender_name(),
+                nickname=name,
             )
+            return StepResult(msg=f"已插入At组件(@{name})")
 
         # 未命中 → 清除所有 at
         elif not hit and has_at:
@@ -142,5 +144,6 @@ class AtStep(BaseStep):
                         continue
                 new_chain.append(c)
             ctx.chain[:] = new_chain
+            return StepResult(msg="已移除了@头")
 
         return StepResult()

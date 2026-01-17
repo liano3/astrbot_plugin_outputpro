@@ -69,7 +69,7 @@ class StepResult:
     """步骤是否成功"""
     abort: bool = False
     """是否需要中断处理"""
-    message: str | None = None
+    msg: str | None = None
     """附加消息"""
     data: Any | None = None
     """携带的上下文信息"""

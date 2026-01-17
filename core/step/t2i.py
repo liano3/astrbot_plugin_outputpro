@@ -29,20 +29,21 @@ class T2IStep(BaseStep):
             logger.error(f"加载 pillowmd 失败: {e}")
 
     async def handle(self, ctx: OutContext) -> StepResult:
-
         if (
             isinstance(ctx.chain[-1], Plain)
             and len(ctx.chain[-1].text) > self.cfg.threshold
         ):
             style = self.style or await self._load_style()
             if style:
+                text = ctx.chain[-1].text
                 img = await style.AioRender(
-                    text=ctx.chain[-1].text,
+                    text=text,
                     useImageUrl=True,
                     autoPage=self.cfg.auto_page,
                 )
                 path = img.Save(self.image_cache_dir)
                 ctx.chain[-1] = Image.fromFileSystem(str(path))
+                return StepResult(msg=f"已将文本消息({text[:10]})转化为图片消息")
         return StepResult()
 
     async def terminate(self):

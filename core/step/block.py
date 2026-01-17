@@ -19,7 +19,7 @@ class BlockStep(BaseStep):
             ctx.event.set_result(ctx.event.plain_result(""))
             return StepResult(
                 abort=True,
-                message=f"已拦截超时消息: {ctx.plain}",
+                msg=f"已拦截超时消息: {ctx.plain}",
             )
 
         if ctx.is_llm:
@@ -31,7 +31,7 @@ class BlockStep(BaseStep):
             ctx.event.set_result(ctx.event.plain_result(""))
             return StepResult(
                 abort=True,
-                message=f"已拦截超时消息: {ctx.plain}",
+                msg=f"已拦截超时消息: {ctx.plain}",
             )
 
         if ctx.is_llm:
@@ -43,7 +43,7 @@ class BlockStep(BaseStep):
                 ctx.event.set_result(ctx.event.plain_result(""))
                 return StepResult(
                     abort=True,
-                    message=f"已拦截人机话术: {ctx.plain}",
+                    msg=f"已拦截人机话术: {ctx.plain}",
                 )
 
     # ================== 主入口 ==================

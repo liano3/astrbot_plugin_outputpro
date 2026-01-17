@@ -13,25 +13,29 @@ class ErrorStep(BaseStep):
 
     async def handle(self, ctx: OutContext) -> StepResult:
         mode = self.cfg.mode
+
         if mode == "ignore":
             return StepResult()
 
         for word in self.cfg.keywords:
-            if word not in ctx.plain:
-                continue
+            if word in ctx.plain:
+                if mode == "forward":
+                    if self.admin_id:
+                        ctx.event.message_obj.group_id = ""
+                        ctx.event.message_obj.sender.user_id = self.admin_id
+                        return StepResult(
+                            msg=f"命中报错关键词{word}, 已将消息发送目标改为管理员（{self.admin_id}）"
+                        )
+                    else:
+                        return StepResult(
+                            ok=False,
+                            msg=f"命中报错关键词{word}, 未配置管理员ID，无法转发错误信息",
+                        )
 
-            if mode == "forward":
-                if self.admin_id:
-                    ctx.event.message_obj.group_id = ""
-                    ctx.event.message_obj.sender.user_id = self.admin_id
+                elif mode == "block":
+                    ctx.event.set_result(ctx.event.plain_result(""))
                     return StepResult(
-                        message=f"已将消息发送目标改为管理员（{self.admin_id}）私聊"
+                        abort=True, msg=f"命中报错关键词{word}, 已将消息事件结果清空"
                     )
-                else:
-                    return StepResult(ok=False, message="未配置管理员ID，无法转发错误信息")
-
-            elif mode == "block":
-                ctx.event.set_result(ctx.event.plain_result(""))
-                return StepResult(abort=True, message=f"已拦截报错提示：{ctx.plain}")
 
         return StepResult()

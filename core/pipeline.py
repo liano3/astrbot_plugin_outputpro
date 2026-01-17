@@ -97,11 +97,11 @@ class Pipeline:
                 continue
 
             result = await step.handle(ctx)
-            if result.message:
+            if result.msg:
                 if result.ok:
-                    logger.debug(result.message)
+                    logger.debug(result.msg)
                 else:
-                    logger.warning(result.message)
+                    logger.warning(result.msg)
 
             if result.abort:
                 return False

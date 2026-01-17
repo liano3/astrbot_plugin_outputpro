@@ -51,18 +51,18 @@ class SummaryStep(BaseStep):
     async def handle(self, ctx: OutContext) -> StepResult:
         """图片外显（直接发送并中断流水线）"""
         if (
-            not isinstance(ctx.event, AiocqhttpMessageEvent)
-            or len(ctx.chain) != 1
-            or not isinstance(ctx.chain[0], Image)
+            isinstance(ctx.event, AiocqhttpMessageEvent)
+            and len(ctx.chain) != 1
+            and isinstance(ctx.chain[0], Image)
         ):
-            return StepResult()
+            obmsg = await ctx.event._parse_onebot_json(MessageChain(ctx.chain))
+            quote = random.choice(self.quotes)
+            obmsg[0]["data"]["summary"] = quote
 
-        obmsg = await ctx.event._parse_onebot_json(MessageChain(ctx.chain))
-        obmsg[0]["data"]["summary"] = random.choice(self.quotes)
+            await ctx.event.bot.send(ctx.event.message_obj.raw_message, obmsg)  # type: ignore
+            ctx.event.should_call_llm(True)
+            ctx.chain.clear()
 
-        await ctx.event.bot.send(ctx.event.message_obj.raw_message, obmsg)  # type: ignore
-        ctx.event.should_call_llm(True)
-        ctx.chain.clear()
+            return StepResult(abort=True, msg=f"已给图片附加外显金句：{quote}")
 
         return StepResult()
-
