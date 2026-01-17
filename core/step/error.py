@@ -34,6 +34,7 @@ class ErrorStep(BaseStep):
 
         if self.cfg.forward_umo == "admin":
             if not self.admins_id:
+                logger.warning("未配置管理员ID，无法转发报错信息")
                 return "未配置管理员ID，无法转发报错信息"
 
             failed = []
