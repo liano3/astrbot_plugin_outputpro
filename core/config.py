@@ -5,62 +5,97 @@ import re
 from collections.abc import MutableMapping
 from typing import Any, get_type_hints
 
+from astrbot.api import logger
 from astrbot.core.config.astrbot_config import AstrBotConfig
 from astrbot.core.star.context import Context
 from astrbot.core.star.star_tools import StarTools
 
-# ==================================================
-# 基础 Section（所有子配置的基类）
-# ==================================================
 
-
-class Section:
+class ConfigNode:
     """
-    强类型配置节点基类
-    - 字段由类型注解声明
-    - 数据直接写回原 dict
+    配置节点, 把 dict 变成强类型对象。
+
+    规则：
+    - schema 来自子类类型注解
+    - 声明字段：读写，写回底层 dict
+    - 未声明字段和下划线字段：仅挂载属性，不写回
+    - 支持 ConfigNode 多层嵌套（lazy + cache）
     """
 
-    __slots__ = ("_data",)
+    _SCHEMA_CACHE: dict[type, dict[str, type]] = {}
+    _FIELDS_CACHE: dict[type, set[str]] = {}
+
+    # ---------- schema ----------
+
+    @classmethod
+    def _schema(cls) -> dict[str, type]:
+        return cls._SCHEMA_CACHE.setdefault(cls, get_type_hints(cls))
+
+    @classmethod
+    def _fields(cls) -> set[str]:
+        return cls._FIELDS_CACHE.setdefault(
+            cls,
+            {k for k in cls._schema() if not k.startswith("_")},
+        )
 
     def __init__(self, data: MutableMapping[str, Any]):
         object.__setattr__(self, "_data", data)
-
-        # 必填字段校验
-        hints = get_type_hints(self.__class__)
-        for key in hints:
-            if key not in data:
-                raise KeyError(f"缺少配置字段: {key}")
+        object.__setattr__(self, "_children", {})
+        for key in self._fields():
+            if key not in data and not hasattr(self.__class__, key):
+                logger.warning(f"[config:{self.__class__.__name__}] 缺少字段: {key}")
+                continue
 
     def __getattr__(self, key: str) -> Any:
-        try:
-            value = self._data[key]
-        except KeyError:
-            raise AttributeError(key) from None
-        return self._wrap(value)
+        if key in self._fields():
+            value = self._data.get(key)
+            tp = self._schema().get(key)
+
+            if isinstance(tp, type) and issubclass(tp, ConfigNode):
+                children: dict[str, ConfigNode] = self.__dict__["_children"]
+                if key not in children:
+                    if not isinstance(value, MutableMapping):
+                        raise TypeError(
+                            f"[config:{self.__class__.__name__}] "
+                            f"字段 {key} 期望 dict，实际是 {type(value).__name__}"
+                        )
+                    children[key] = tp(value)
+                return children[key]
+
+            return value
+
+        if key in self.__dict__:
+            return self.__dict__[key]
+
+        raise AttributeError(key)
 
     def __setattr__(self, key: str, value: Any) -> None:
-        if key.startswith("_"):
-            object.__setattr__(self, key, value)
-        else:
+        if key in self._fields():
             self._data[key] = value
+            return
+        object.__setattr__(self, key, value)
 
-    def raw(self) -> MutableMapping[str, Any]:
+    def raw_data(self) -> MutableMapping[str, Any]:
+        """
+        获取底层配置 dict（实际引用，只读语义）
+        """
         return self._data
 
-    @staticmethod
-    def _wrap(value: Any) -> Any:
-        if isinstance(value, MutableMapping):
-            return value
-        return value
+    def save_config(self) -> None:
+        """
+        保存配置到磁盘（仅允许在根节点调用）
+        """
+        if not isinstance(self._data, AstrBotConfig):
+            raise RuntimeError(
+                f"{self.__class__.__name__}.save_config() 只能在根配置节点上调用"
+            )
+        self._data.save_config()
 
 
-# ==================================================
-# 各 Section 类型定义（与 JSON 一一对应）
-# ==================================================
+# ============ 插件自定义配置 ==================
 
 
-class PipelineConfig(Section):
+class PipelineConfig(ConfigNode):
     lock_order: bool
     steps: list[str]
     llm_steps: list[str]
@@ -77,29 +112,29 @@ class PipelineConfig(Section):
         return step_name in self._llm_steps
 
 
-class SummaryConfig(Section):
+class SummaryConfig(ConfigNode):
     quotes: list[str]
     quotes_files: list[str]
 
 
-class ErrorConfig(Section):
+class ErrorConfig(ConfigNode):
     keywords: list[str]
     custom_msg: str
     forward_umo: str
 
 
-class BlockConfig(Section):
+class BlockConfig(ConfigNode):
     timeout: int
     block_reread: bool
     ai_words: list[str]
 
 
-class AtConfig(Section):
+class AtConfig(ConfigNode):
     at_str: bool
     at_prob: float
 
 
-class CleanConfig(Section):
+class CleanConfig(ConfigNode):
     text_threshold: int
     bracket: bool
     parenthesis: bool
@@ -110,12 +145,12 @@ class CleanConfig(Section):
     punctuation: str
 
 
-class ReplaceConfig(Section):
+class ReplaceConfig(ConfigNode):
     words: list[str]
     default_new_word: str
 
 
-class TTSConfig(Section):
+class TTSConfig(ConfigNode):
     group_id: str
     character: str
     threshold: int
@@ -126,28 +161,28 @@ class TTSConfig(Section):
         self._character_id = self.character.split("（", 1)[1][:-1]
 
 
-class T2IConfig(Section):
+class T2IConfig(ConfigNode):
     threshold: int
     pillowmd_style_dir: str
     auto_page: bool
     clean_cache: bool
 
 
-class ReplyConfig(Section):
+class ReplyConfig(ConfigNode):
     threshold: int
 
 
-class ForwardConfig(Section):
+class ForwardConfig(ConfigNode):
     threshold: int
     node_name: str
 
 
-class RecallConfig(Section):
+class RecallConfig(ConfigNode):
     keywords: list[str]
     delay: int
 
 
-class SplitConfig(Section):
+class SplitConfig(ConfigNode):
     char_list: list[str]
     max_count: int
     typing_delay: str
@@ -168,42 +203,8 @@ class SplitConfig(Section):
                 tokens.append(re.escape(ch))
         return f"[{''.join(tokens)}]+"
 
-# ==================================================
-# AstrBotConfig Facade（第一层）
-# ==================================================
 
-
-class TypedConfigFacade:
-    __annotations__: dict[str, type]
-
-    def __init__(self, cfg: AstrBotConfig):
-        object.__setattr__(self, "_cfg", cfg)
-
-        hints = get_type_hints(self.__class__)
-        for key, tp in hints.items():
-            if key.startswith("_"):
-                continue
-            if not isinstance(tp, type) or not issubclass(tp, Section):
-                continue
-            if key not in cfg:
-                raise KeyError(f"缺少配置段: {key}")
-
-            section = tp(cfg[key])
-            object.__setattr__(self, key, section)
-
-    def __getattr__(self, key: str) -> Any:
-        return self._cfg[key]
-
-    def save(self):
-        self._cfg.save_config()
-
-# ==================================================
-# 插件配置入口
-# ==================================================
-
-
-class PluginConfig(TypedConfigFacade):
-    # ===== JSON 配置 =====
+class PluginConfig(ConfigNode):
     pipeline: PipelineConfig
     summary: SummaryConfig
     error: ErrorConfig
@@ -220,7 +221,6 @@ class PluginConfig(TypedConfigFacade):
 
     def __init__(self, cfg: AstrBotConfig, *, context: Context):
         super().__init__(cfg)
-        # ===== 内置配置 =====
         self.context = context
         self.admins_id: list[str] = context.get_config().get("admins_id", [])
         self.data_dir = StarTools.get_data_dir("astrbot_plugin_outputpro")
