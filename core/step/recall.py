@@ -49,7 +49,6 @@ class RecallStep(BaseStep):
         except ValueError:
             pass
 
-
     def _is_recall(self, chain: list[BaseMessageComponent]) -> str | None:
         """判断消息是否需撤回，并返回原因"""
         for seg in chain:
@@ -61,7 +60,6 @@ class RecallStep(BaseStep):
                 return "包含图片（暂未识别是否色图）"
         return None
 
-
     async def _recall_msg(self, client: CQHttp, message_id: int, reason: str):
         """撤回消息"""
         await asyncio.sleep(self.cfg.delay)
@@ -70,7 +68,6 @@ class RecallStep(BaseStep):
             logger.debug(f"已自动撤回消息: {message_id}，原因：{reason}")
         except Exception as e:
             logger.error(f"撤回消息失败: {e}（原因：{reason}）")
-
 
     async def handle(self, ctx: OutContext) -> StepResult:
         """对外接口：发消息并撤回"""
@@ -84,7 +81,9 @@ class RecallStep(BaseStep):
             reason = self._is_recall(ctx.chain)
             if reason:
                 ctx.event.should_call_llm(True)
-                obmsg = await ctx.event._parse_onebot_json(MessageChain(chain=ctx.chain))
+                obmsg = await ctx.event._parse_onebot_json(
+                    MessageChain(chain=ctx.chain)
+                )
                 client = ctx.event.bot
 
                 send_result = None

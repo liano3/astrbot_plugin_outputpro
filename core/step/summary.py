@@ -1,7 +1,3 @@
-
-
-
-
 import json
 import random
 from pathlib import Path
@@ -20,6 +16,7 @@ from .base import BaseStep
 
 class SummaryStep(BaseStep):
     name = StepName.SUMMARY
+
     def __init__(self, config: PluginConfig):
         super().__init__(config)
         self.cfg = config.summary
@@ -46,7 +43,6 @@ class SummaryStep(BaseStep):
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning("读取金句文件失败 %s: %s", path, e)
         return quotes
-
 
     async def handle(self, ctx: OutContext) -> StepResult:
         """图片外显（直接发送并中断流水线）"""

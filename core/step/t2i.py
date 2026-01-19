@@ -11,6 +11,7 @@ from .base import BaseStep
 
 class T2IStep(BaseStep):
     name = StepName.T2I
+
     def __init__(self, config: PluginConfig):
         super().__init__(config)
         self.cfg = config.t2i

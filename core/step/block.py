@@ -19,14 +19,14 @@ class BlockStep(BaseStep):
             ctx.event.set_result(ctx.event.plain_result(""))
             return StepResult(abort=True, msg=f"已拦截超时消息: {ctx.plain}")
 
-    async def _block_dedup(self, ctx: OutContext) -> StepResult | None:
+    async def _block_reread(self, ctx: OutContext) -> StepResult | None:
         if not self.cfg.block_reread:
             return None
         if ctx.plain in ctx.group.bot_msgs:
             ctx.event.set_result(ctx.event.plain_result(""))
             return StepResult(abort=True, msg=f"已拦截流口水消息: {ctx.plain}")
 
-    async def _block_ai(self, ctx: OutContext) -> StepResult | None:
+    async def _block_words(self, ctx: OutContext) -> StepResult | None:
         for word in self.cfg.ai_words:
             if word in ctx.plain:
                 ctx.event.set_result(ctx.event.plain_result(""))
@@ -40,8 +40,8 @@ class BlockStep(BaseStep):
     async def handle(self, ctx: OutContext) -> StepResult:
         for checker in (
             self._block_timeout,
-            self._block_dedup,
-            self._block_ai,
+            self._block_reread,
+            self._block_words,
         ):
             result = await checker(ctx)
             if result is not None:

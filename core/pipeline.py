@@ -67,7 +67,8 @@ class Pipeline:
             for name in self.cfg._steps:
                 cls = step_map.get(name)
                 if not cls:
-                    raise ValueError(f"Unknown pipeline step: {name}")
+                    logger.warning(f"未知的步骤: {name}")
+                    continue
                 step = cls(self.plugin_config)
                 self._steps.append(step)
 

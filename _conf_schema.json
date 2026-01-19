@@ -149,9 +149,9 @@
                 "hint": "一些劣质模型容易出现流口水现象，即一直回复相同的内容，此时可拦截此消息",
                 "default": true
             },
-            "ai_words": {
-                "description": "拦截人机所用关键词",
-                "hint": "Bot发的消息中，包含列表中任一关键字时，判定为过于人机，消息将被拦截",
+            "block_words": {
+                "description": "拦截关键词",
+                "hint": "Bot发的消息中，包含列表中任一关键字时，消息将被拦截",
                 "type": "list",
                 "default": [
                     "抱歉",

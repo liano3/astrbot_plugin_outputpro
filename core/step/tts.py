@@ -12,6 +12,7 @@ from .base import BaseStep
 
 class TTSStep(BaseStep):
     name = StepName.TTS
+
     def __init__(self, config: PluginConfig):
         super().__init__(config)
         self.cfg = config.tts

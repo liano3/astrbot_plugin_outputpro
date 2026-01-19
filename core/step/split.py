@@ -136,7 +136,9 @@ class SplitStep(BaseStep):
         delay = min_delay + (max_delay - min_delay) * ratio
         return delay
 
-    def _wrap_plain_with_zwsp(self, comps: list[BaseMessageComponent]) -> list[BaseMessageComponent]:
+    def _wrap_plain_with_zwsp(
+        self, comps: list[BaseMessageComponent]
+    ) -> list[BaseMessageComponent]:
         wrapped: list[BaseMessageComponent] = []
         for comp in comps:
             if isinstance(comp, Plain) and comp.text:
