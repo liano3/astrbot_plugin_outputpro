@@ -27,7 +27,7 @@ class BlockStep(BaseStep):
             return StepResult(abort=True, msg=f"已拦截流口水消息: {ctx.plain}")
 
     async def _block_words(self, ctx: OutContext) -> StepResult | None:
-        for word in self.cfg.ai_words:
+        for word in self.cfg.block_words:
             if word in ctx.plain:
                 ctx.event.set_result(ctx.event.plain_result(""))
                 return StepResult(
