@@ -2,7 +2,6 @@ from astrbot.api.event import filter
 from astrbot.api.star import Context, Star
 from astrbot.core import AstrBotConfig
 from astrbot.core.platform.astr_message_event import AstrMessageEvent
-from astrbot.core.star.star_tools import StarTools
 
 from .core.config import PluginConfig
 from .core.model import OutContext, StateManager, StepName
@@ -12,10 +11,8 @@ from .core.pipeline import Pipeline
 class OutputPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        self.context = context
         self.cfg = PluginConfig(config, context=context)
         self.pipeline = Pipeline(self.cfg)
-        self.data_dir = StarTools.get_data_dir()
 
     async def initialize(self):
         await self.pipeline.initialize()
