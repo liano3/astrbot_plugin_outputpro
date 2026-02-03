@@ -200,7 +200,6 @@ class SplitStep(BaseStep):
                 segments.append(Segment(comps))
 
         def push(seg: Segment):
-            """? segment ???????? max_count ??"""
             nonlocal exhausted
             if not seg.components:
                 return
@@ -218,7 +217,6 @@ class SplitStep(BaseStep):
                 segments.append(seg)
 
         def flush():
-            """???? segment"""
             nonlocal current
             if current.components:
                 push(current)
