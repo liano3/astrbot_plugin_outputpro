@@ -1,5 +1,5 @@
 import asyncio
-import re
+import random
 from dataclasses import dataclass, field
 
 from astrbot.api import logger
@@ -54,28 +54,6 @@ class SplitStep(BaseStep):
         self.cfg = config.split
         self.context = config.context
 
-        # 最大分段数（<=0 表示不限制）
-        self.max_count = self.cfg.max_count
-
-        # 最大文本长度归一化，用于映射到 min/max
-        self._max_len_for_delay = 150
-
-        # 末尾标点清除正则
-        tail_punc = ".,，。、;；:："
-        self.tail_punc_re = re.compile(f"[{re.escape(tail_punc)}]+$")
-        self._pair_map = {
-            "“": "”",
-            "《": "》",
-            "（": "）",
-            "(": ")",
-            "[": "]",
-            "{": "}",
-            "‘": "’",
-            "【": "】",
-            "<": ">",
-        }
-        self._quote_chars = {'"', "'", "`"}
-
     async def handle(self, ctx: OutContext) -> StepResult:
         """
         对消息进行拆分并发送。
@@ -86,6 +64,16 @@ class SplitStep(BaseStep):
             return StepResult()
 
         segments = self._split_chain(ctx.chain)
+
+        # 后处理
+        for seg in segments:
+            for comp in seg.components:
+                if isinstance(comp, Plain):
+                    comp.text = comp.text.rstrip()
+            for comp in reversed(seg.components):
+                if isinstance(comp, Plain) and comp.text.strip():
+                    comp.text = self.cfg.tail_punc_re.sub("", comp.text)
+                    break
 
         if len(segments) <= 1:
             return StepResult()
@@ -105,7 +93,7 @@ class SplitStep(BaseStep):
                     ctx.event.unified_msg_origin,
                     MessageChain(send_comps),
                 )
-                delay = self._calc_delay(len(seg.text))
+                delay = self._calc_delay(seg.text)
                 await asyncio.sleep(delay)
             except Exception as e:
                 logger.error(f"[Splitter] 发送分段 {i + 1} 失败: {e}")
@@ -120,19 +108,43 @@ class SplitStep(BaseStep):
         return StepResult(msg="分段回复完成")
 
 
-    def _calc_delay(self, text_len: int) -> float:
-        """
-        根据文本长度计算延迟（线性映射到 min_delay ~ max_delay）：
-        - 短文本 → 接近 min_delay
-        - 长文本 → 接近 max_delay
-        """
-        if text_len <= 0:
+    def _calc_delay(self, text: str) -> float:
+        """计算延迟(拟人打字)"""
+        if not text:
             return 0.0
-        min_delay = self.cfg._min_delay
-        max_delay = self.cfg._max_delay
-        ratio = min(text_len / self._max_len_for_delay, 1.0)
-        delay = min_delay + (max_delay - min_delay) * ratio
-        return delay
+
+        cfg = self.cfg
+        n = len(text)
+        base_char_time = 1.0 / max(cfg.typing_cps, 1e-3)
+
+        jitter = random.uniform(
+            1.0 - cfg.typing_jitter,
+            1.0 + cfg.typing_jitter,
+        )
+        char_time = base_char_time * jitter
+        char_time = min(max(char_time, 0.02), 0.20)
+
+        delay = n * char_time
+
+        # 标点 / 换行停顿
+        delay += (
+            text.count("，") * 0.06
+            + text.count("。") * 0.18
+            + text.count("！") * 0.14
+            + text.count("？") * 0.16
+            + text.count("…") * 0.22
+            + text.count("\n") * 0.35
+        )
+
+        # 短停顿
+        if random.random() < cfg.pause_prob:
+            delay += random.uniform(*cfg.pause_range)
+
+        # 长停顿（少量）
+        if random.random() < cfg.long_pause_prob:
+            delay += random.uniform(*cfg.long_pause_range)
+
+        return min(delay, cfg.max_delay_cap)
 
     def _wrap_plain_with_zwsp(
         self, comps: list[BaseMessageComponent]
@@ -153,177 +165,173 @@ class SplitStep(BaseStep):
 
     def _split_chain(self, chain: list[BaseMessageComponent]) -> list[Segment]:
         """
-        拆分核心逻辑
+        ??????
         """
         segments: list[Segment] = []
         current = Segment()
+        exhausted = False
 
-        # 用于存放“必须绑定到下一个 segment 的组件”
-        # 例如：Reply / At
+        # Reply / At
         pending_prefix: list[BaseMessageComponent] = []
 
+        def _merge_space_if_needed(target: Segment, comps: list[BaseMessageComponent]):
+            if target.components and comps:
+                if isinstance(comps[0], Plain):
+                    comps[0].text = " " + comps[0].text
+
+        def _attach_pending(target: Segment):
+            if pending_prefix:
+                target.extend(pending_prefix)
+                pending_prefix.clear()
+
+        def _append_to_tail(comps: list[BaseMessageComponent]):
+            nonlocal current
+            if exhausted and segments:
+                _merge_space_if_needed(segments[-1], comps)
+                segments[-1].extend(comps)
+                return
+            if current.components:
+                _merge_space_if_needed(current, comps)
+                current.extend(comps)
+            elif segments:
+                _merge_space_if_needed(segments[-1], comps)
+                segments[-1].extend(comps)
+            else:
+                segments.append(Segment(comps))
+
         def push(seg: Segment):
-            """将 segment 推入列表，并处理 max_count 限制"""
+            """? segment ???????? max_count ??"""
+            nonlocal exhausted
             if not seg.components:
                 return
 
-            if self.max_count > 0 and len(segments) >= self.max_count:
-                # 超出限制则合并到最后一个 segment
-                # 在合并处强制添加一个空格，确保文本不粘连
-                if segments[-1].components and seg.components:
-                    if isinstance(seg.components[0], Plain):
-                        seg.components[0].text = " " + seg.components[0].text
-                segments[-1].extend(seg.components)
+            count = self.cfg.max_count
+            if count > 0:
+                if len(segments) < count:
+                    segments.append(seg)
+                    if len(segments) >= count:
+                        exhausted = True
+                else:
+                    exhausted = True
+                    _append_to_tail(seg.components)
             else:
                 segments.append(seg)
 
         def flush():
-            """提交当前 segment"""
+            """???? segment"""
             nonlocal current
             if current.components:
                 push(current)
                 current = Segment()
 
         for comp in chain:
-            # Reply / At：必须与“后一个 segment”绑定
+            # Reply / At
             if isinstance(comp, Reply | At):
                 pending_prefix.append(comp)
                 continue
 
-            # Plain 组件
+            # Plain
             if isinstance(comp, Plain):
                 text = comp.text or ""
                 if not text:
                     continue
-                # 智能分段
-                if self.cfg.smart:
-                    stack: list[str] = []
-                    pattern = re.compile(self.cfg._split_pattern)
-                    i = 0
-                    n = len(text)
-                    buf = ""
 
-                    while i < n:
-                        ch = text[i]
-                        is_opener = ch in self._pair_map
+                if exhausted:
+                    if segments:
+                        _attach_pending(segments[-1])
+                    else:
+                        _attach_pending(current)
+                    _append_to_tail([Plain(text)])
+                    continue
 
-                        if ch in self._quote_chars:
-                            if stack and stack[-1] == ch:
-                                stack.pop()
-                            else:
-                                stack.append(ch)
-                            buf += ch
-                            i += 1
-                            continue
+                stack: list[str] = []
+                pattern = self.cfg.split_re
+                i = 0
+                n = len(text)
+                buf = ""
 
-                        if stack:
-                            expected_closer = self._pair_map.get(stack[-1])
-                            if ch == expected_closer:
-                                stack.pop()
-                            elif is_opener:
-                                stack.append(ch)
-                            buf += ch
-                            i += 1
-                            continue
+                while i < n:
+                    ch = text[i]
+                    is_opener = ch in self.cfg.pair_map
 
-                        if is_opener:
+                    if ch in self.cfg.quote_chars:
+                        if stack and stack[-1] == ch:
+                            stack.pop()
+                        else:
                             stack.append(ch)
-                            buf += ch
-                            i += 1
-                            continue
+                        buf += ch
+                        i += 1
+                        continue
 
-                        m = pattern.match(text, i)
-                        if m:
-                            delim = m.group()
-                            buf += delim
-                            if buf:
-                                if pending_prefix:
-                                    current.extend(pending_prefix)
-                                    pending_prefix.clear()
-                                current.append(Plain(buf))
-                                flush()
-                                buf = ""
-                            i += len(delim)
-                        else:
-                            buf += ch
-                            i += 1
+                    if stack:
+                        expected_closer = self.cfg.pair_map.get(stack[-1])
+                        if ch == expected_closer:
+                            stack.pop()
+                        elif is_opener:
+                            stack.append(ch)
+                        buf += ch
+                        i += 1
+                        continue
 
-                    if buf:
-                        if pending_prefix:
-                            current.extend(pending_prefix)
-                            pending_prefix.clear()
-                        current.append(Plain(buf))
-                # 普通分段
-                else:
-                    parts = re.split(f"({self.cfg._split_pattern})", text)
-                    buf = ""
+                    if is_opener:
+                        stack.append(ch)
+                        buf += ch
+                        i += 1
+                        continue
 
-                    for part in parts:
-                        if not part:
-                            continue
+                    m = pattern.match(text, i)
+                    if m:
+                        delim = m.group()
+                        buf += delim
+                        if buf:
+                            _attach_pending(current)
+                            current.append(Plain(buf))
+                            flush()
+                            buf = ""
+                            if exhausted:
+                                remaining = text[i + len(delim) :]
+                                if remaining:
+                                    _append_to_tail([Plain(remaining)])
+                                break
+                        i += len(delim)
+                    else:
+                        buf += ch
+                        i += 1
 
-                        if re.fullmatch(self.cfg._split_pattern, part):
-                            buf += part
-                            if buf:
-                                if pending_prefix:
-                                    current.extend(pending_prefix)
-                                    pending_prefix.clear()
-
-                                current.append(Plain(buf))
-                                flush()
-                                buf = ""
-                        else:
-                            if buf:
-                                if pending_prefix:
-                                    current.extend(pending_prefix)
-                                    pending_prefix.clear()
-                                current.append(Plain(buf))
-                                buf = ""
-
-                            if pending_prefix:
-                                current.extend(pending_prefix)
-                                pending_prefix.clear()
-
-                            current.append(Plain(part))
-
-                    if buf:
-                        if pending_prefix:
-                            current.extend(pending_prefix)
-                            pending_prefix.clear()
-                        current.append(Plain(buf))
-
+                if buf and not exhausted:
+                    _attach_pending(current)
+                    current.append(Plain(buf))
                 continue
 
-            # Image / Face：跟随上一个 segment
+            # Image / Face
             if isinstance(comp, Image | Face):
                 if current.components:
+                    _attach_pending(current)
                     current.append(comp)
                 elif segments:
+                    _attach_pending(segments[-1])
                     segments[-1].append(comp)
                 else:
-                    push(Segment([comp]))
+                    _attach_pending(current)
+                    current.append(comp)
                 continue
 
-            # 其他组件：必须独立成段
+            # 其他
+            if exhausted:
+                if segments:
+                    _attach_pending(segments[-1])
+                else:
+                    _attach_pending(current)
+                _append_to_tail([comp])
+                continue
+
             flush()
-            if pending_prefix:
-                push(Segment(pending_prefix[:]))
-                pending_prefix.clear()
-            push(Segment([comp]))
+            seg = Segment()
+            _attach_pending(seg)
+            seg.append(comp)
+            push(seg)
 
         if current.components:
             push(current)
 
-        # 后处理：去除所有 Plain 组件的末尾空白字符， 去除最后一个 Plain 组件的末尾符号
-        for seg in segments:
-            for comp in seg.components:
-                if isinstance(comp, Plain):
-                    comp.text = comp.text.rstrip()
-            for comp in reversed(seg.components):
-                if isinstance(comp, Plain) and comp.text.strip():
-                    comp.text = self.tail_punc_re.sub("", comp.text)
-                    break
         return segments
-
-
-
