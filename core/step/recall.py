@@ -57,9 +57,7 @@ class RecallStep(BaseStep):
                     if word in seg.text:
                         logger.debug(f"包含敏感关键词：{word}")
                         return True
-            elif isinstance(seg, Image):
-                return False
-        return True
+        return False
 
     async def _recall_msg(self, client: CQHttp, message_id: int):
         """撤回消息"""
