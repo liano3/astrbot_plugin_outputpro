@@ -165,7 +165,7 @@ class SplitStep(BaseStep):
 
     def _split_chain(self, chain: list[BaseMessageComponent]) -> list[Segment]:
         """
-        ??????
+        核心分段逻辑
         """
         segments: list[Segment] = []
         current = Segment()
