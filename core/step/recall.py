@@ -49,25 +49,26 @@ class RecallStep(BaseStep):
         except ValueError:
             pass
 
-    def _is_recall(self, chain: list[BaseMessageComponent]) -> str | None:
+    def _is_recall(self, chain: list[BaseMessageComponent]) -> bool:
         """判断消息是否需撤回，并返回原因"""
         for seg in chain:
             if isinstance(seg, Plain):
                 for word in self.cfg.keywords:
                     if word in seg.text:
-                        return f"包含敏感关键词：{word}"
+                        logger.debug(f"包含敏感关键词：{word}")
+                        return True
             elif isinstance(seg, Image):
-                return "包含图片（暂未识别是否色图）"
-        return None
+                return False
+        return True
 
-    async def _recall_msg(self, client: CQHttp, message_id: int, reason: str):
+    async def _recall_msg(self, client: CQHttp, message_id: int):
         """撤回消息"""
         await asyncio.sleep(self.cfg.delay)
         try:
             await client.delete_msg(message_id=message_id)
-            logger.debug(f"已自动撤回消息: {message_id}，原因：{reason}")
+            logger.debug(f"已自动撤回消息: {message_id}")
         except Exception as e:
-            logger.error(f"撤回消息失败: {e}（原因：{reason}）")
+            logger.error(f"撤回消息失败: {e}")
 
     async def handle(self, ctx: OutContext) -> StepResult:
         """对外接口：发消息并撤回"""
@@ -78,8 +79,7 @@ class RecallStep(BaseStep):
             )
             for seg in ctx.chain
         ):
-            reason = self._is_recall(ctx.chain)
-            if reason:
+            if self._is_recall(ctx.chain):
                 ctx.event.should_call_llm(True)
                 obmsg = await ctx.event._parse_onebot_json(
                     MessageChain(chain=ctx.chain)
@@ -98,14 +98,14 @@ class RecallStep(BaseStep):
 
                 if send_result and (message_id := send_result.get("message_id")):
                     task = asyncio.create_task(
-                        self._recall_msg(client, int(message_id), reason)
+                        self._recall_msg(client, int(message_id))
                     )
                     task.add_done_callback(self._remove_task)
                     self.recall_tasks.append(task)
 
                 ctx.chain.clear()
                 return StepResult(
-                    msg=f"已启动撤回任务（{reason}），将在 {self.cfg.delay} 秒后撤回消息"
+                    msg=f"已启动撤回任务，将在 {self.cfg.delay} 秒后撤回消息"
                 )
 
         return StepResult()
