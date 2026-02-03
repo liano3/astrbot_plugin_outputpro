@@ -195,14 +195,62 @@ class RecallConfig(ConfigNode):
 
 class SplitConfig(ConfigNode):
     char_list: list[str]
+    """触发或参与消息拆分的字符集合"""
+
     max_count: int
-    typing_delay: str
-    smart: bool
+    """最大拆分段数，超出部分合并到最后一段"""
+
+    typing_cps: float
+    """模拟打字速度（字/秒），6~10 更像真人"""
+
+    max_delay_cap: float
+    """单次发送最大延迟（秒）"""
 
     def __init__(self, data: MutableMapping[str, Any]):
         super().__init__(data)
-        self._min_delay, self._max_delay = map(float, self.typing_delay.split(","))
+
         self._split_pattern = self._build_split_pattern()
+        """文本拆分用的正则模式"""
+
+        self.split_re = re.compile(self._split_pattern)
+        """已编译的拆分正则"""
+
+        tail_punc = ".,，。、;；:："
+        """需要清理的段尾标点"""
+
+        self.tail_punc_re = re.compile(f"[{re.escape(tail_punc)}]+$")
+        """段尾标点清理正则"""
+
+        self.pair_map = {
+            "“": "”",
+            "《": "》",
+            "（": "）",
+            "(": ")",
+            "[": "]",
+            "{": "}",
+            "‘": "’",
+            "【": "】",
+            "<": ">",
+        }
+        """成对符号映射，用于避免错误拆分"""
+
+        self.quote_chars = {'"', "'", "`"}
+        """成对引号字符"""
+
+        self.typing_jitter: float = 0.30
+        """打字速度随机浮动比例"""
+
+        self.pause_prob: float = 0.18
+        """触发短暂停顿的概率"""
+
+        self.pause_range: tuple[float, float] = (0.35, 1.10)
+        """短暂停顿时长范围（秒）"""
+
+        self.long_pause_prob: float = 0.04
+        """触发长暂停顿的概率"""
+
+        self.long_pause_range: tuple[float, float] = (1.6, 3.4)
+        """长暂停顿时长范围（秒）"""
 
     def _build_split_pattern(self) -> str:
         tokens = []
