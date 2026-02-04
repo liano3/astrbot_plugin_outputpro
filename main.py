@@ -20,7 +20,7 @@ class OutputPlugin(Star):
     async def terminate(self):
         await self.pipeline.terminate()
 
-    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
+    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE, priority=1000)
     async def on_message(self, event: AstrMessageEvent):
         """收到群消息时"""
         gid = event.get_group_id()

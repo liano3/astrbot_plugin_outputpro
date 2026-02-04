@@ -280,6 +280,11 @@ class SplitStep(BaseStep):
                     m = pattern.match(text, i)
                     if m:
                         delim = m.group()
+
+                        if not buf and not current.components:
+                            i += len(delim)
+                            continue
+
                         buf += delim
                         if buf:
                             _attach_pending(current)
