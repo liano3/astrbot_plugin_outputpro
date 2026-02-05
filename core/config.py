@@ -181,6 +181,7 @@ class T2IConfig(ConfigNode):
 
 class ReplyConfig(ConfigNode):
     threshold: int
+    include_at: bool
 
 
 class ForwardConfig(ConfigNode):

@@ -174,6 +174,11 @@ class SplitStep(BaseStep):
         # Reply / At
         pending_prefix: list[BaseMessageComponent] = []
 
+        # 占位符逻辑，用于保护 Reply + At 后的等宽空格
+        PLACEHOLDER = "__OUTPUTPRO_SPACING_PLACEHOLDER__"
+        PROTECTED_SPACE = "\u200b \u200b"
+        has_protected = False
+
         def _merge_space_if_needed(target: Segment, comps: list[BaseMessageComponent]):
             if target.components and comps:
                 if isinstance(comps[0], Plain):
@@ -233,6 +238,13 @@ class SplitStep(BaseStep):
                 text = comp.text or ""
                 if not text:
                     continue
+
+                # 占位符保护逻辑：检测 Reply + At 后的等宽空格
+                if not has_protected and len(pending_prefix) >= 2 and \
+                   isinstance(pending_prefix[0], Reply) and isinstance(pending_prefix[1], At) and \
+                   text.startswith(PROTECTED_SPACE):
+                    text = text.replace(PROTECTED_SPACE, PLACEHOLDER, 1)
+                    has_protected = True
 
                 if exhausted:
                     if segments:
@@ -336,5 +348,11 @@ class SplitStep(BaseStep):
 
         if current.components:
             push(current)
+
+        # 还原占位符
+        for seg in segments:
+            for comp in seg.components:
+                if isinstance(comp, Plain) and comp.text and PLACEHOLDER in comp.text:
+                    comp.text = comp.text.replace(PLACEHOLDER, PROTECTED_SPACE)
 
         return segments
