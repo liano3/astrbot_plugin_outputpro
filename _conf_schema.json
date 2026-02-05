@@ -421,9 +421,9 @@
             },
             "include_at": {
                 "description": "引用时包含艾特",
-                "hint": "开启后，在引用回复的同时会艾特被回复的人。默认开启。",
+                "hint": "开启后，在引用回复的同时会艾特被回复的人",
                 "type": "bool",
-                "default": true
+                "default": false
             }
         }
     },
