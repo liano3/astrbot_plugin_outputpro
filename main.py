@@ -11,7 +11,7 @@ from .core.pipeline import Pipeline
 class OutputPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        self.cfg = PluginConfig(config, context=context)
+        self.cfg = PluginConfig(config, context)
         self.pipeline = Pipeline(self.cfg)
 
     async def initialize(self):
