@@ -280,7 +280,7 @@ class PluginConfig(ConfigNode):
     recall: RecallConfig
     split: SplitConfig
 
-    def __init__(self, cfg: AstrBotConfig, *, context: Context):
+    def __init__(self, cfg: AstrBotConfig, context: Context):
         super().__init__(cfg)
         self.context = context
         self.admins_id: list[str] = context.get_config().get("admins_id", [])
