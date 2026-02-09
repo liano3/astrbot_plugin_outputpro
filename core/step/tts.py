@@ -29,7 +29,7 @@ class TTSStep(BaseStep):
             try:
                 text = ctx.chain[0].text
                 audio = await ctx.event.bot.get_ai_record(
-                    character=self.cfg._character_id,
+                    character=self.cfg.character_id,
                     group_id=int(self.cfg.group_id),
                     text=text,
                 )

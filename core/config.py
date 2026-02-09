@@ -163,13 +163,9 @@ class ReplaceConfig(ConfigNode):
 
 class TTSConfig(ConfigNode):
     group_id: str
-    character: str
+    character_id: str
     threshold: int
     prob: float
-
-    def __init__(self, data: MutableMapping[str, Any]):
-        super().__init__(data)
-        self._character_id = self.character.split("（", 1)[1][:-1]
 
 
 class T2IConfig(ConfigNode):
