@@ -1,3 +1,4 @@
+import re
 import random
 
 from astrbot.core.message.components import Plain, Record
@@ -9,6 +10,8 @@ from ..config import PluginConfig
 from ..model import OutContext, StepName, StepResult
 from .base import BaseStep
 
+# 清洗：XML标签 OR 中括号内容 OR 小括号内容
+_XML_TAG_RE = re.compile(r"<[^>]+>|\[[^\]]*\]|\([^)]*\)")
 
 class TTSStep(BaseStep):
     name = StepName.TTS
@@ -28,6 +31,10 @@ class TTSStep(BaseStep):
         ):
             try:
                 text = ctx.chain[0].text
+                # 去除 XML/HTML 风格的表情标签（如 <sticker name="sigh"/>）
+                text = _XML_TAG_RE.sub("", text).strip()
+                if not text:
+                    return StepResult()
                 audio = await ctx.event.bot.get_ai_record(
                     character=self.cfg.character_id,
                     group_id=int(self.cfg.group_id),
