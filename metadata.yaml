@@ -4,4 +4,4 @@ desc: Astrbot输出管道：图片外显 → 报错处理 → 消息拦截 → �
 help: 略
 version: v2.1.6
 author: Zhalslar
-repo: https://github.com/Zhalslar/astrbot_plugin_outputpro
+repo: https://github.com/liano3/astrbot_plugin_outputpro
