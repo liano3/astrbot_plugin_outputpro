@@ -388,6 +388,12 @@
                     "step": 0.01
                 },
                 "default": 0.1
+            },
+            "llm_decide": {
+                "description": "LLM 主动决定是否转语音",
+                "hint": "开启后，将在 LLM 系统提示词中注入指令，让 LLM 通过 <voice/> 标签主动选择是否以语音回复。关闭则使用概率触发。",
+                "type": "bool",
+                "default": false
             }
         }
     },
