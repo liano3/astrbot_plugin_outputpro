@@ -1,6 +1,7 @@
 import re
 import random
 
+from astrbot.api import logger
 from astrbot.core.message.components import Plain, Record
 from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
     AiocqhttpMessageEvent,
@@ -52,7 +53,11 @@ class TTSStep(BaseStep):
                         group_id=int(self.cfg.group_id),
                         text=text,
                     )
-                    ctx.chain[:] = [Record.fromURL(audio)]
+                    result = ctx.event.get_result()
+                    if result:
+                        result.chain = [Record.fromURL(audio)]
+                    else:
+                        logger.warning("TTS: get_result() returned None, cannot set voice message")
                     return StepResult(msg=f"已将文本消息{text[:10]}转化为语音消息")
                 except Exception as e:
                     return StepResult(ok=False, msg=str(e))
