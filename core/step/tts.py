@@ -52,7 +52,9 @@ class TTSStep(BaseStep):
                         group_id=int(self.cfg.group_id),
                         text=text,
                     )
-                    ctx.chain[:] = [Record.fromURL(audio)]
+                    result = ctx.event.get_result()
+                    if result:
+                        result.chain = [Record.fromURL(audio)]
                     return StepResult(msg=f"已将文本消息{text[:10]}转化为语音消息")
                 except Exception as e:
                     return StepResult(ok=False, msg=str(e))
