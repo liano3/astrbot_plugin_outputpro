@@ -25,10 +25,9 @@ class TTSStep(BaseStep):
 
     def _should_convert(self, text: str) -> tuple[bool, str]:
         """判断是否应该转语音，返回 (是否转换, 清理后的文本)"""
-        has_voice_tag = bool(_VOICE_TAG_RE.search(text))
-        if has_voice_tag:
-            cleaned = _VOICE_TAG_RE.sub("", text).strip()
-            return True, cleaned
+        cleaned, count = _VOICE_TAG_RE.subn("", text)
+        if count > 0:
+            return True, cleaned.strip()
         if self.cfg.llm_decide:
             return False, text
         if random.random() < self.cfg.prob:
