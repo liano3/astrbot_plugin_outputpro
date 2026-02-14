@@ -47,7 +47,6 @@ class OutputPlugin(Star):
         if not self.cfg.tts.llm_decide:
             return
 
-        prob_percent = int(self.cfg.tts.prob * 100)
         instruction_prompt = f"""
 在回答用户问题时，你可以选择将回复转为语音消息发送。
 
@@ -56,7 +55,7 @@ class OutputPlugin(Star):
    <voice/>
 2. 每条消息最多使用 1 个 <voice/> 标签，放在回复内容的末尾。
 3. 仅在回复内容较短（不超过 {self.cfg.tts.threshold} 字）且适合口语化表达时才使用语音标签。
-4. 大多数情况下不需要使用语音，使用语音的概率控制在 {prob_percent}% 左右。
+4. 大多数情况下不需要使用语音，请偶尔使用，保持克制。
 5. 当回复包含代码、列表、长段落等结构化内容时，不要使用语音标签。
 """
         req.system_prompt += f"\n\n{instruction_prompt}"

@@ -60,7 +60,8 @@ class TTSStep(BaseStep):
 
         # 即使不转语音，也要清除可能存在的 <voice/> 标签
         if (
-            len(ctx.chain) == 1
+            isinstance(ctx.event, AiocqhttpMessageEvent)
+            and len(ctx.chain) == 1
             and isinstance(ctx.chain[0], Plain)
             and _VOICE_TAG_RE.search(ctx.chain[0].text)
         ):
