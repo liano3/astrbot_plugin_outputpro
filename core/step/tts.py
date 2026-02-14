@@ -29,7 +29,9 @@ class TTSStep(BaseStep):
         if has_voice_tag:
             cleaned = _VOICE_TAG_RE.sub("", text).strip()
             return True, cleaned
-        if not self.cfg.llm_decide and random.random() < self.cfg.prob:
+        if self.cfg.llm_decide:
+            return False, text
+        if random.random() < self.cfg.prob:
             return True, text
         return False, text
 
