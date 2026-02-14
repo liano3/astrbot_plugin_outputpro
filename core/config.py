@@ -166,6 +166,7 @@ class TTSConfig(ConfigNode):
     character_id: str
     threshold: int
     prob: float
+    llm_decide: bool
 
 
 class T2IConfig(ConfigNode):
