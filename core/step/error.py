@@ -25,6 +25,21 @@ class ErrorStep(BaseStep):
                 return word
         return None
 
+    def _build_session(self, ctx: OutContext, target_id: str):
+        """
+        根据 target_id 构造 session。
+        - 以 "g:" 开头 → 群聊（GROUP_MESSAGE），如 "g:123456789"
+        - 否则 → 私聊（FRIEND_MESSAGE）
+        """
+        session = copy.copy(ctx.event.session)
+        if target_id.startswith("g:"):
+            session.session_id = target_id[2:]
+            session.message_type = MessageType.GROUP_MESSAGE
+        else:
+            session.session_id = target_id
+            session.message_type = MessageType.FRIEND_MESSAGE
+        return session
+
     async def _forward_to_admin(self, ctx: OutContext) -> str:
         """
         转发消息给设定的会话
@@ -41,9 +56,7 @@ class ErrorStep(BaseStep):
             failed = []
             for admin_id in self.admins_id:
                 try:
-                    session = copy.copy(ctx.event.session)
-                    session.session_id = admin_id
-                    session.message_type = MessageType.FRIEND_MESSAGE
+                    session = self._build_session(ctx, admin_id)
                     await context.send_message(session, chain)
                 except asyncio.CancelledError:
                     raise
@@ -55,14 +68,29 @@ class ErrorStep(BaseStep):
                 return f"转发失败，失败 admin: {','.join(failed)}"
             return "转发成功"
 
-        try:
-            await context.send_message(self.cfg.forward_umo, chain)
-            return "转发成功"
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            logger.warning(f"转发给 {self.cfg.forward_umo} 失败：{e}")
-            return f"转发失败：{e}"
+        # forward_umo 是具体 ID
+        forward_umo: str = self.cfg.forward_umo
+        if forward_umo.startswith("g:"):
+            # 群聊：直接用 session 发送
+            try:
+                session = self._build_session(ctx, forward_umo)
+                await context.send_message(session, chain)
+                return "转发成功"
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.warning(f"转发给 {forward_umo} 失败：{e}")
+                return f"转发失败：{e}"
+        else:
+            # 原有逻辑：直接传 umo 字符串（私聊 unified_msg_origin）
+            try:
+                await context.send_message(forward_umo, chain)
+                return "转发成功"
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.warning(f"转发给 {forward_umo} 失败：{e}")
+                return f"转发失败：{e}"
 
     async def handle(self, ctx: OutContext) -> StepResult:
         hit_word = self._find_hit_keyword(ctx.plain)
