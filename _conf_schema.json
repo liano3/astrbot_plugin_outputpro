@@ -121,7 +121,7 @@
             },
             "forward_umo": {
                 "description": "转发的会话ID",
-                "hint": "将报错信息转发到此会话，用 sid 命令可查看当前会话的ID。填 admin 则转发给配置中的所有 Bot 管理员, 留空则不转发",
+                "hint": "将报错信息转发到此会话，用 sid 命令可查看当前会话的ID。填 admin 则转发给配置中的所有 Bot 管理员, 留空则不转发，默认私聊，比如“114514”，g:开头表示群聊，比如“g:114514”",
                 "type": "string",
                 "default": "admin"
             }
