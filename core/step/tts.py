@@ -11,9 +11,11 @@ from ..config import PluginConfig
 from ..model import OutContext, StepName, StepResult
 from .base import BaseStep
 
-# 清洗：XML标签 OR 中括号内容 OR 小括号内容
+# 清洗：XML标签 OR 中括号内容 OR 小括号内容（转语音时用，清洗所有标签）
 _XML_TAG_RE = re.compile(r"<[^>]+>|\[[^\]]*\]|\([^)]*\)")
 _VOICE_TAG_RE = re.compile(r"<voice\s*/?>")
+# 清洗非 sticker 的 XML 标签（不转语音时用，保留 <sticker .../> 供发表情）
+_NON_STICKER_TAG_RE = re.compile(r"<(?!sticker[\s/>])[^>]+>")
 
 
 class TTSStep(BaseStep):
@@ -41,7 +43,7 @@ class TTSStep(BaseStep):
             and len(ctx.chain) == 1
             and isinstance(ctx.chain[0], Plain)
             and len(ctx.chain[0].text) < self.cfg.threshold
-        ):
+        ):  
             should_convert, cleaned_text = self._should_convert(ctx.chain[0].text)
             if should_convert:
                 try:
@@ -62,13 +64,14 @@ class TTSStep(BaseStep):
                 except Exception as e:
                     return StepResult(ok=False, msg=str(e))
 
-        # 即使不转语音，也要清除可能存在的 <voice/> 标签
+        # 即使不转语音，也要清除 <voice/> 及其他杂散 XML 标签，但保留 <sticker .../> 供发表情
         if (
             isinstance(ctx.event, AiocqhttpMessageEvent)
             and len(ctx.chain) == 1
             and isinstance(ctx.chain[0], Plain)
-            and _VOICE_TAG_RE.search(ctx.chain[0].text)
-        ):
-            ctx.chain[0].text = _VOICE_TAG_RE.sub("", ctx.chain[0].text).strip()
+        ):  
+            cleaned = _NON_STICKER_TAG_RE.sub("", ctx.chain[0].text).strip()
+            if cleaned != ctx.chain[0].text:
+                ctx.chain[0].text = cleaned
 
         return StepResult()
