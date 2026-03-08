@@ -26,7 +26,7 @@ class AtStep(BaseStep):
             r"\[at[:：]\s*(\d+)\]"
             r"|\[at[:：]\s*([^\]]+)\]"
             r"|@(\d{5,12})"
-            r"|@([\u4e00-\u9fa5\w-]{2,20})"
+            r"|@([\u4e00-\u9fa5\w\-（）()·. ]{2,30})"
             r")\s*",
             re.IGNORECASE,
         )
@@ -69,13 +69,23 @@ class AtStep(BaseStep):
 
             m = self.at_head_regex.match(seg.text)
             if not m:
-                return None, None, None
+                # 当前节点不匹配，继续扫描后续节点
+                continue
 
             qq = m.group(1) or m.group(3)
             nickname = m.group(2) or m.group(4)
 
+            if nickname:
+                nickname = nickname.strip()
+
             if not qq and nickname and len(ctx.group.name_to_qq) > 0:
                 qq = ctx.group.name_to_qq.get(nickname)
+
+                # 模糊匹配：去掉括号内容后再查一次
+                if not qq:
+                    bare = re.sub(r"[（(].+?[)）]", "", nickname).strip()
+                    if bare and bare != nickname:
+                        qq = ctx.group.name_to_qq.get(bare)
 
             return idx, qq, nickname
 
